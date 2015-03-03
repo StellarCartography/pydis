@@ -48,6 +48,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
+from scipy.interpolate import SmoothBivariateSpline
 import scipy.signal
 
 def gaus(x,a,b,x0,sigma):
@@ -100,7 +101,38 @@ def spec_trace(img, nsteps=100):
     my = ap_spl(mx)
     return my
 
-
+# def sky_subtract(image, My, apwidth=5, skysep=30, skybin=30):
+#     skysubflux = np.zeros_like(My)
+#     for i in range(0,len(My)):
+#         fit a parabola outside +/- skysep from My skybin wide
+#         skysubflux[i] = sum up image within apwidth, subtracting parabola
+#         return skysubflux
+#
+#
+#
+# def HeNeAr_fit(calimage, linelist):
+#     take a slice thru calimage, find the peaks
+#     trace the peaks vertically, allow curve, spline as before
+#
+#     fit against linelist
+#
+#     # scipy.interpolate.SmoothBivariateSpline
+#     treat the wavelenth solution as a surface
+#     return wavemap
+#
+#
+# def mapwavelength(trace, wavemap):
+#     use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
+#     return trace_wave
+#
+#
+# def flatcombine(flatlist):
+#
+#     return flat
+#
+# def biascombine(biaslist):
+#
+#     return bias
 
 # test data setup
 datafile = 'example_data/Gliese176.0052b.fits'

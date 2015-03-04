@@ -40,7 +40,6 @@ Things I'm not going to worry about:
 - extended objects on slit
 - flux calibration (yet)
 
-
 """
 
 from astropy.io import fits
@@ -124,7 +123,7 @@ def ap_extract(img, trace, apwidth=5.0):
 
 
 #########################
-def sky_fit(img, trace, apwidth=5, skysep=30, skywidth=60, skydeg=2):
+def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
     # do simple parabola fit at each pixel
     # (assume wavelength axis is perfectly vertical)
     # return 1-d sky values
@@ -156,15 +155,15 @@ def sky_fit(img, trace, apwidth=5, skysep=30, skywidth=60, skydeg=2):
 #     # scipy.interpolate.SmoothBivariateSpline
 #     treat the wavelenth solution as a surface
 #     return wavemap
-#
+
 ##########################
 # def mapwavelength(trace, wavemap):
 #     use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
 #     return trace_wave
-#
+
 
 #########################
-def biascombine(biaslist, trim=True):
+def biascombine(biaslist, output='BIAS.fits', trim=True):
     # assume biaslist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
     files = np.loadtxt(biaslist,dtype='string')
@@ -191,11 +190,11 @@ def biascombine(biaslist, trim=True):
 
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(bias)
-    hduOut.writeto('BIAS.fits',clobber=True)
+    hduOut.writeto(output, clobber=True)
     return bias
 
 #########################
-def flatcombine(flatlist, bias, trim=True):
+def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
     # read the bias in, BUT we don't know if it's the numpy array or file name
     if isinstance(bias, str):
         # read in file if a string
@@ -235,43 +234,56 @@ def flatcombine(flatlist, bias, trim=True):
 
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(flat)
-    hduOut.writeto('FLAT.fits',clobber=True)
+    hduOut.writeto(output, clobber=True)
     return flat #,ok
-# i want to return the flat "OK" mask, but only optionally.... need to make a flat class. later
+# i want to return the flat "OK" mask to use later,
+# but only optionally.... need to make a flat class. later...
 
 
 #########################
-def autoreduce(specfile, flatlist, biaslist, trim=True, write_reduced=True):
-    # assume specfile is name of object spectrum
+def autoreduce(speclist, flatlist, biaslist, trim=True, write_reduced=True, display=True):
+    # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)
     flat = flatcombine(flatlist, bias, trim=True)
 
-    hdu = fits.open(specfile)
-    if trim is False:
-        raw = hdu[0].data
-    if trim is True:
-        datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-        d = map(float, datasec)
-        raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+    specfile = np.loadtxt(speclist,dtype='string')
 
-    # remove bias and flat
-    data = (raw - bias) / flat
+    for spec in specfile:
+        hdu = fits.open(spec)
+        if trim is False:
+            raw = hdu[0].data
+        if trim is True:
+            datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+            d = map(float, datasec)
+            raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+        hdu.close(closed=True)
 
-    # with reduced data, trace the aperture
-    trace = ap_trace(data, nsteps=50)
+        # remove bias and flat
+        data = (raw - bias) / flat
 
-    ext_spec = ap_extract(data, trace, apwidth=3)
-    sky = sky_fit(data, trace, apwidth=3)
+        # with reduced data, trace the aperture
+        trace = ap_trace(data, nsteps=50)
 
-    plt.figure()
-    plt.imshow(np.log10(data), origin = 'lower',aspect='auto')
-    plt.plot(np.arange(data.shape[1]), trace,'k',lw=1)
-    plt.plot(np.arange(data.shape[1]), trace-3.,'r',lw=1)
-    plt.plot(np.arange(data.shape[1]), trace+3.,'r',lw=1)
-    plt.show()
+        # extract the spectrum
+        ext_spec = ap_extract(data, trace, apwidth=3)
 
-    return ext_spec,sky, data, raw, bias, flat, trace
+        # measure sky values along trace
+        sky = sky_fit(data, trace, apwidth=3)
 
+        if display is True:
+            plt.figure()
+            plt.imshow(np.log10(data), origin = 'lower',aspect='auto')
+            plt.colorbar()
+            plt.plot(np.arange(data.shape[1]), trace,'k',lw=1)
+            plt.plot(np.arange(data.shape[1]), trace-3.,'r',lw=1)
+            plt.plot(np.arange(data.shape[1]), trace+3.,'r',lw=1)
+            plt.show()
+
+        # write output file for extracted spectrum
+        if write_reduced is True:
+            np.savetxt(spec+'.apextract',ext_spec-sky)
+
+    return #ext_spec, sky, data, raw, bias, flat, trace
 
 
 
@@ -290,30 +302,18 @@ d = map(float, datasec)
 
 img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
-#### test trace
-# plt.figure()
-# plt.imshow(np.log10(img), origin = 'lower',aspect='auto')
-# plt.plot(np.arange(img.shape[1]), ap_trace(img),'k',lw=3)
-# plt.show()
 
-#### test flat and bias combine
-# bias_done = biascombine('bbias.lis')
-# flat_done = flatcombine('bflat.lis', bias_done)
-# flat_done2 = flatcombine('bflat.lis', 'BIAS.fits')
-#
-# plt.figure()
-# plt.imshow( flat_done, origin='lower')
-# plt.show()
-#
-# plt.figure()
-# plt.imshow( flat_done2, origin='lower')
-# plt.show()
 
-ext_spec,sky, data,raw, bias, flat, trace = autoreduce(datafile, 'bflat.lis', 'bbias.lis',trim=True)
+# ext_spec,sky, data,raw, bias, flat, trace = autoreduce('example_data/Gliese176.0052b.fits',
+#                                                        'bflat.lis', 'bbias.lis',trim=True)
+# ext_spec,sky, data,raw, bias, flat, trace = autoreduce('example_data/Gliese176.0053r.fits',
+#                                                        'rflat.lis', 'rbias.lis',trim=True)
 
-plt.figure()
-plt.plot(ext_spec-sky)
-plt.show()
+autoreduce('robj.lis','rflat.lis', 'rbias.lis',trim=True)
+
+# plt.figure()
+# plt.plot(ext_spec-sky)
+# plt.show()
 
 # plt.figure()
 # plt.imshow(np.log10((raw-bias)/flat), origin = 'lower',aspect='auto')

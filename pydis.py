@@ -2,11 +2,11 @@
 """
 Created on Mon Mar  2 17:40:42 2015
 
-@author: jradavenport
+@author: jradavenport, much help by jruan
 
 Try to make a simple one dimensional spectra reduction package
 
-Based heavily on Python4Astronomers tutorial:
+Some ideas from Python4Astronomers tutorial:
     https://python4astronomers.github.io/core/numpy_scipy.html
 
 Plus some simple reduction (flat and bias) methods
@@ -106,14 +106,14 @@ def ap_trace(img, nsteps=100):
     return my
 
 #########################
-def ap_extract(img, trace, width=5.0):
+def ap_extract(img, trace, apwidth=5.0):
     # simply add up the total flux around the trace +/- width
     onedspec = np.zeros_like(trace)
     for i in range(0,len(trace)):
         # juuuust in case the trace gets too close to the edge
         # (shouldn't be common)
-        widthup = width
-        widthdn = width
+        widthup = apwidth
+        widthdn = apwidth
         if (trace[i]+widthup > img.shape[0]):
             widthup = img.shape[0]-trace[i] - 1
         if (trace[i]-widthdn < 0):
@@ -124,12 +124,23 @@ def ap_extract(img, trace, width=5.0):
 
 
 #########################
-# def sky_fit(image, My, apwidth=5, skysep=30, skybin=30):
-#     skysubflux = np.zeros_like(My)
-#     for i in range(0,len(My)):
-#         fit a parabola outside +/- skysep from My skybin wide
-#         skysubflux[i] = sum up image within apwidth, subtracting parabola
-#         return skysubflux
+def sky_fit(img, trace, apwidth=5, skysep=30, skywidth=60, skydeg=2):
+    # do simple parabola fit at each pixel
+    # (assume wavelength axis is perfectly vertical)
+    # return 1-d sky values
+    skysubflux = np.zeros_like(trace)
+    for i in range(0,len(trace)):
+        itrace = int(trace[i])
+        y = np.append(np.arange(itrace-skysep-skywidth, itrace-skysep),
+                      np.arange(itrace+skysep, itrace+skysep+skywidth))
+        z = img[y,i]
+        # fit a polynomial to the sky in this column
+        pfit = np.polyfit(y,z,skydeg)
+        # define the aperture in this column
+        ap = np.arange(trace[i]-apwidth,trace[i]+apwidth)
+        # evaluate the polynomial across the aperture, and sum
+        skysubflux[i] = np.sum(np.polyval(pfit, ap))
+    return skysubflux
 
 
 ##########################
@@ -206,11 +217,16 @@ def flatcombine(flatlist, bias, trim=True):
             d = map(float, datasec)
             im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]] - bias_im
 
+        # check for bad regions (not illuminated) in the spatial direction
+        ycomp = im_i.sum(axis=1) # compress to y-axis only
+        illum_thresh = 0.8 # value compressed data must reach to be used for flat normalization
+        ok = np.where( (ycomp>= np.median(ycomp)*illum_thresh) )
+
         # assume a median scaling for each flat to account for possible different exposure times
         if (i==0):
-            all_data = im_i / np.median(im_i)
+            all_data = im_i / np.median(im_i[ok,:])
         elif (i>0):
-            all_data = np.dstack( (all_data, im_i / np.median(im_i)) )
+            all_data = np.dstack( (all_data, im_i / np.median(im_i[ok,:])) )
         hdu_i.close(closed=True)
 
     # do median across whole stack
@@ -220,14 +236,15 @@ def flatcombine(flatlist, bias, trim=True):
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(flat)
     hduOut.writeto('FLAT.fits',clobber=True)
-    return flat
+    return flat #,ok
+# i want to return the flat "OK" mask, but only optionally.... need to make a flat class. later
 
 
 #########################
 def autoreduce(specfile, flatlist, biaslist, trim=True, write_reduced=True):
     # assume specfile is name of object spectrum
-    bias = biascombine(biaslist, trim = trim)
-    flat = flatcombine(flatlist, bias, trim=trim)
+    bias = biascombine(biaslist, trim = True)
+    flat = flatcombine(flatlist, bias, trim=True)
 
     hdu = fits.open(specfile)
     if trim is False:
@@ -241,11 +258,19 @@ def autoreduce(specfile, flatlist, biaslist, trim=True, write_reduced=True):
     data = (raw - bias) / flat
 
     # with reduced data, trace the aperture
-    trace = ap_trace(data)
+    trace = ap_trace(data, nsteps=50)
 
-    ext_spec = ap_extract(data, trace)
+    ext_spec = ap_extract(data, trace, apwidth=3)
+    sky = sky_fit(data, trace, apwidth=3)
 
-    return
+    plt.figure()
+    plt.imshow(np.log10(data), origin = 'lower',aspect='auto')
+    plt.plot(np.arange(data.shape[1]), trace,'k',lw=1)
+    plt.plot(np.arange(data.shape[1]), trace-3.,'r',lw=1)
+    plt.plot(np.arange(data.shape[1]), trace+3.,'r',lw=1)
+    plt.show()
+
+    return ext_spec,sky, data, raw, bias, flat, trace
 
 
 
@@ -267,7 +292,7 @@ img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
 #### test trace
 # plt.figure()
-# plt.imshow(np.log10(img), origin = 'lower')
+# plt.imshow(np.log10(img), origin = 'lower',aspect='auto')
 # plt.plot(np.arange(img.shape[1]), ap_trace(img),'k',lw=3)
 # plt.show()
 
@@ -284,3 +309,12 @@ img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 # plt.imshow( flat_done2, origin='lower')
 # plt.show()
 
+ext_spec,sky, data,raw, bias, flat, trace = autoreduce(datafile, 'bflat.lis', 'bbias.lis',trim=True)
+
+plt.figure()
+plt.plot(ext_spec-sky)
+plt.show()
+
+# plt.figure()
+# plt.imshow(np.log10((raw-bias)/flat), origin = 'lower',aspect='auto')
+# plt.show()

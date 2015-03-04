@@ -56,7 +56,7 @@ def gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 #########################
-def spec_trace(img, nsteps=100):
+def ap_trace(img, nsteps=100):
     '''
     Aperture finding and tracing
 
@@ -76,11 +76,11 @@ def spec_trace(img, nsteps=100):
     # popt,pcov = curve_fit(gaus, np.arange(len(comp_y)), comp_y,
     #                       p0=[np.amax(comp_y), np.median(comp_y), peak_y, 2.])
     # peak_dy = popt[3]    
-    
 
     # median smooth to crudely remove cosmic rays
     img_sm = scipy.signal.medfilt2d(img, kernel_size=(5,5))
-    
+
+    # define the bin edges
     xbins = np.linspace(0, img.shape[1], nsteps)
     ybins = np.zeros_like(xbins)
     for i in range(0,len(xbins)-1):
@@ -90,28 +90,48 @@ def spec_trace(img, nsteps=100):
         #-- fit gaussian w/i each window
         zi = img_sm[:,xbins[i]:xbins[i+1]].sum(axis=1)
         yi = np.arange(len(zi))
-        popt,pcov = curve_fit(gaus, yi, zi,
-                              p0=[np.amax(zi), np.median(zi), np.argmax(zi), 2.])
+        popt,pcov = curve_fit(gaus, yi, zi, p0=[np.amax(zi), np.median(zi), np.argmax(zi), 2.])
         ybins[i] = popt[2]
-        
+
+    # recenter the bin positions, trim the unused bin off in Y
     mxbins = (xbins[:-1] + xbins[1:])/2.
     mybins = ybins[:-1]
-    
+
+    # run a cubic spline thru the bins
     ap_spl = UnivariateSpline(mxbins, mybins, ext=0, k=3)
-    
+
+    # interpolate the spline to 1 position per column
     mx = np.arange(0,img.shape[1])
     my = ap_spl(mx)
     return my
 
 #########################
-# def sky_subtract(image, My, apwidth=5, skysep=30, skybin=30):
+def ap_extract(img, trace, width=5.0):
+    # simply add up the total flux around the trace +/- width
+    onedspec = np.zeros_like(trace)
+    for i in range(0,len(trace)):
+        # juuuust in case the trace gets too close to the edge
+        # (shouldn't be common)
+        widthup = width
+        widthdn = width
+        if (trace[i]+widthup > img.shape[0]):
+            widthup = img.shape[0]-trace[i] - 1
+        if (trace[i]-widthdn < 0):
+            widthdn = trace[i] - 1
+
+        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup, i].sum()
+    return onedspec
+
+
+#########################
+# def sky_fit(image, My, apwidth=5, skysep=30, skybin=30):
 #     skysubflux = np.zeros_like(My)
 #     for i in range(0,len(My)):
 #         fit a parabola outside +/- skysep from My skybin wide
 #         skysubflux[i] = sum up image within apwidth, subtracting parabola
 #         return skysubflux
-#
-#
+
+
 ##########################
 # def HeNeAr_fit(calimage, linelist):
 #     take a slice thru calimage, find the peaks
@@ -163,7 +183,6 @@ def biascombine(biaslist, trim=True):
     hduOut.writeto('BIAS.fits',clobber=True)
     return bias
 
-
 #########################
 def flatcombine(flatlist, bias, trim=True):
     # read the bias in, BUT we don't know if it's the numpy array or file name
@@ -205,8 +224,35 @@ def flatcombine(flatlist, bias, trim=True):
 
 
 #########################
+def autoreduce(specfile, flatlist, biaslist, trim=True, write_reduced=True):
+    # assume specfile is name of object spectrum
+    bias = biascombine(biaslist, trim = trim)
+    flat = flatcombine(flatlist, bias, trim=trim)
+
+    hdu = fits.open(specfile)
+    if trim is False:
+        raw = hdu[0].data
+    if trim is True:
+        datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+        d = map(float, datasec)
+        raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+
+    # remove bias and flat
+    data = (raw - bias) / flat
+
+    # with reduced data, trace the aperture
+    trace = ap_trace(data)
+
+    ext_spec = ap_extract(data, trace)
+
+    return
+
+
+
+
 #########################
-# test data setup
+#  Test Data / Examples
+#########################
 datafile = 'example_data/Gliese176.0052b.fits'
 flatfile = 'example_data/flat.0039b.fits'
 biasfile = 'example_data/bias.0014b.fits'
@@ -222,18 +268,19 @@ img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 #### test trace
 # plt.figure()
 # plt.imshow(np.log10(img), origin = 'lower')
-# plt.plot(np.arange(img.shape[1]), spec_trace(img),'k',lw=3)
+# plt.plot(np.arange(img.shape[1]), ap_trace(img),'k',lw=3)
 # plt.show()
 
-bias_done = biascombine('bbias.lis')
-flat_done = flatcombine('bflat.lis', bias_done)
-flat_done2 = flatcombine('bflat.lis', 'BIAS.fits')
-
-plt.figure()
-plt.imshow( flat_done, origin='lower')
-plt.show()
-
-plt.figure()
-plt.imshow( flat_done2, origin='lower')
-plt.show()
+#### test flat and bias combine
+# bias_done = biascombine('bbias.lis')
+# flat_done = flatcombine('bflat.lis', bias_done)
+# flat_done2 = flatcombine('bflat.lis', 'BIAS.fits')
+#
+# plt.figure()
+# plt.imshow( flat_done, origin='lower')
+# plt.show()
+#
+# plt.figure()
+# plt.imshow( flat_done2, origin='lower')
+# plt.show()
 

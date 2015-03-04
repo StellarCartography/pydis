@@ -143,18 +143,70 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-# def HeNeAr_fit(calimage, linelist):
-#     take a slice thru calimage, find the peaks
+def HeNeAr_fit(calimage, linelist=1, trim=True):
+    hdu = fits.open(calimage)
+    if trim is False:
+        img = hdu[0].data
+    if trim is True:
+        datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+        d = map(float, datasec)
+        img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+
+    # this approach will be very DIS specific
+    disp_approx = hdu[0].header['DISPDW']
+    wcen_approx = hdu[0].header['DISPWC']
+
+    # the red chip wavelength is backwards
+    clr = hdu[0].header['DETECTOR']
+    if (clr.lower()=='red'):
+        sign = -1.0
+    else:
+        sign = 1.0
+
+    # take a slice thru the data (+/- 10 pixels)
+    slice = img[img.shape[0]/2-10:img.shape[0]/2+10,:].sum(axis=0)
+
+    # use the header info to do rough solution
+    wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
+
+    # sort data, cut top 5% of flux data as peak threshold
+    tmp = slice.copy()
+    tmp.sort()
+    flux_thresh = tmp[int(len(tmp)*0.95)]
+
+    # find flux above threshold
+    high = np.where( (slice >= flux_thresh) )
+
+    # find  individual peaks (separated by > 1 pixel)
+    pk = high[0][ ((high[0][1:]-high[0][:-1])>1) ]
+
+
+    plt.figure()
+    plt.plot(wtemp, slice, 'b')
+    plt.plot(wtemp, np.ones_like(slice)*np.median(slice),'r')
+    plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
+    plt.scatter(wtemp[pk], slice[pk], marker='o')
+
+
+    pcent_pix = np.zeros_like(pk)
+    # for each peak, fit a gaussian to find center
+    for i in range(len(pk)):
+        xi = wtemp[pk[i]-5:pk[i]+5]
+        yi = slice[pk[i]-5:pk[i]+5]
+        popt,pcov = curve_fit(gaus, xi, yi, p0=[np.amax(yi), np.median(slice), np.argmax(yi), 2.])
+        pcent_pix[i] = popt[]
+
+     plt.show()
+    # then use best guess from linelist
+
+
 #     trace the peaks vertically, allow curve, spline as before
-#
-#    disp_approx = hdu[0].header['DISPDW']
-#    wcen_approx = hdu[0].header['DISPWC']
-#
-#     fit against linelist
 #
 #     # scipy.interpolate.SmoothBivariateSpline
 #     treat the wavelenth solution as a surface
-#     return wavemap
+
+    hdu.close(closed=True)
+    return #wavemap
 
 ##########################
 # def mapwavelength(trace, wavemap):
@@ -302,19 +354,6 @@ d = map(float, datasec)
 
 img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
+#autoreduce('robj.lis','rflat.lis', 'rbias.lis', trim=True, display=False)
 
-
-# ext_spec,sky, data,raw, bias, flat, trace = autoreduce('example_data/Gliese176.0052b.fits',
-#                                                        'bflat.lis', 'bbias.lis',trim=True)
-# ext_spec,sky, data,raw, bias, flat, trace = autoreduce('example_data/Gliese176.0053r.fits',
-#                                                        'rflat.lis', 'rbias.lis',trim=True)
-
-autoreduce('robj.lis','rflat.lis', 'rbias.lis',trim=True)
-
-# plt.figure()
-# plt.plot(ext_spec-sky)
-# plt.show()
-
-# plt.figure()
-# plt.imshow(np.log10((raw-bias)/flat), origin = 'lower',aspect='auto')
-# plt.show()
+HeNeAr_fit('example_data/HeNeAr.0027r.fits')

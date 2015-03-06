@@ -143,7 +143,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist=1, trim=True):
+def HeNeAr_fit(calimage, linelist=1, trim=True, display=True):
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -172,32 +172,48 @@ def HeNeAr_fit(calimage, linelist=1, trim=True):
     # sort data, cut top 5% of flux data as peak threshold
     tmp = slice.copy()
     tmp.sort()
-    flux_thresh = tmp[int(len(tmp)*0.95)]
+    flux_thresh = tmp[int(len(tmp)*0.97)]
 
     # find flux above threshold
     high = np.where( (slice >= flux_thresh) )
 
     # find  individual peaks (separated by > 1 pixel)
-    pk = high[0][ ((high[0][1:]-high[0][:-1])>1) ]
+    pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
 
+    # the number of pixels around the "peak" to fit over
+    pwidth = 10
+    # offset from start/end of array by at least same # of pixels
+    pk = pk[pk > pwidth]
+    pk = pk[pk < (len(slice)-pwidth)]
 
-    plt.figure()
-    plt.plot(wtemp, slice, 'b')
-    plt.plot(wtemp, np.ones_like(slice)*np.median(slice),'r')
-    plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
-    plt.scatter(wtemp[pk], slice[pk], marker='o')
-
+    if display is True:
+        plt.figure()
+        plt.plot(wtemp, slice, 'b')
+        plt.plot(wtemp, np.ones_like(slice)*np.median(slice))
+        plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
 
     pcent_pix = np.zeros_like(pk)
+    wcent_pix = np.zeros_like(pk)
     # for each peak, fit a gaussian to find center
     for i in range(len(pk)):
-        xi = wtemp[pk[i]-5:pk[i]+5]
-        yi = slice[pk[i]-5:pk[i]+5]
-        popt,pcov = curve_fit(gaus, xi, yi, p0=[np.amax(yi), np.median(slice), np.argmax(yi), 2.])
-        pcent_pix[i] = popt[]
+        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*1]
+        yi = slice[pk[i]-pwidth:pk[i]+pwidth*1]
 
-     plt.show()
-    # then use best guess from linelist
+        popt,pcov = curve_fit(gaus, xi, yi, p0=(np.amax(yi), np.median(slice), xi[np.argmax(yi)], 2.))
+
+        pcent_pix[i] = popt[2]
+
+        if display is True:
+            plt.scatter(wtemp[pk], slice[pk], marker='o')
+            plt.plot(xi, gaus(xi,*popt), 'r')
+    if display is True:
+        plt.xlabel('approx. wavelength')
+        plt.ylabel('flux')
+        plt.show()
+
+
+
+    # then match to best guess from linelist
 
 
 #     trace the peaks vertically, allow curve, spline as before
@@ -356,4 +372,5 @@ img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
 #autoreduce('robj.lis','rflat.lis', 'rbias.lis', trim=True, display=False)
 
+HeNeAr_fit('example_data/HeNeAr.0028b.fits')
 HeNeAr_fit('example_data/HeNeAr.0027r.fits')

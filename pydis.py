@@ -23,7 +23,7 @@ e.g.
 Steps to crappy reduction to 1dspec:
 
 1. flat and bias correct (easy)
-2. identify lines in wavelenth cal image (HeNeAr) and define the
+2. identify lines in wavelength cal image (HeNeAr) and define the
     wavelength solution in 2D space
 3. trace the object spectrum, define aperture and sky regions
 4. extract object, subtract sky, interpolate wavelength space
@@ -166,7 +166,7 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, display=Tru
     # take a slice thru the data (+/- 10 pixels)
     slice = img[img.shape[0]/2-10:img.shape[0]/2+10,:].sum(axis=0)
 
-    # use the header info to do rough solution
+    # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
     # sort data, cut top 5% of flux data as peak threshold
@@ -208,7 +208,7 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, display=Tru
         wcent_pix[i] = xi[np.argmax(yi)]
 
         if display is True:
-            plt.scatter(wtemp[pk], slice[pk], marker='o')
+            plt.scatter(wtemp[pk][i], slice[pk][i], marker='o')
             plt.plot(xi, gaus(np.arange(len(xi)),*popt), 'r')
     if display is True:
         plt.xlabel('approx. wavelength')
@@ -216,27 +216,78 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, display=Tru
         #plt.show()
 
 
-
-    # then match to best guess from linelist
-    linewave = np.loadtxt(linelist,dtype='float')
+    # import the linelist to match against
+    linewave,peakwave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,1),unpack=True)
 
     if display is True:
-        plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='|',c='blue')
+        #plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='blue')
+        plt.scatter(linewave,peakwave,marker='o',c='cyan')
         plt.show()
 
+#   loop thru each peak, from center outwards. a greedy solution
+#   find nearest list line. if not line within tolerance, then skip peak
+    pcent = []
+    wcent = []
 
-#   loop thru each peak, from center outwards
-#       find nearest list line. if not line within tolerance, then skip peak
-#       use updated list of matched peaks to interpolate all peaks wavelength spline
-#     pcent = []
-#     wcent = []
-#     ss = np.argsort(np.abs(wcent_pix-wcen_approx))
-#     for i in range(len(pcent_pix)):
-#         np.abs(wcent_pix[ss][i] - linewave)
+    # find center-most lines, sort by dist from center pixels
+    ss = np.argsort(np.abs(wcent_pix-wcen_approx))
 
+    tol = 15. # angstroms... might need to make more flexible?
+    w1d_order = 3 # the polynomial order for the 1d wavelength solution
 
-#     trace the peaks vertically, allow curve, spline as before
-#
+    #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
+    coeff = np.append(np.zeros(w1d_order-1),(disp_approx*sign, wcen_approx))
+
+    for i in range(len(pcent_pix)):
+        xx = pcent_pix-len(slice)/2
+        #wcent_pix = coeff[3] + xx * coeff[2] + coeff[1] * (xx*xx) + coeff[0] * (xx*xx*xx)
+        wcent_pix = np.polyval(coeff, xx)
+
+        if display is True:
+            plt.figure()
+            plt.plot(wtemp, slice, 'b')
+            plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='cyan')
+            plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.max(slice)/2.,marker='*',c='green')
+            plt.scatter(wcent_pix[ss[i]],np.max(slice)/2.,marker='o',c='orange')
+        # if there is a match w/i the linear tolerance
+        if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
+            # add corresponding pixel and *actual* wavelength to output vectors
+            pcent = np.append(pcent,pcent_pix[ss[i]])
+            wcent = np.append(wcent, linewave[np.argmin(np.abs(wcent_pix[ss[i]] - linewave))] )
+
+            if display is True:
+                plt.scatter(wcent,np.ones_like(wcent)*np.max(slice),marker='o',c='red')
+
+            if (len(pcent)>w1d_order):
+                # print('re-fitting')
+                # print(coeff)
+                coeff = np.polyfit(pcent-len(slice)/2,wcent, w1d_order)
+
+        if display is True:
+            plt.xlim((min(wtemp),max(wtemp)))
+            plt.show()
+
+    # the end result is the vector "coeff" has the wavelength solution for "slice"
+    # update the "wtemp" vector that goes with "slice" (fluxes)
+    wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+
+    #-- trace the peaks vertically
+    # how far can the trace be bent, i.e. how big a window to fit over?
+    maxbend = 10 # pixels (+/-)
+
+    # 3d positions of the peaks: (x,y) and wavelength
+    xcent_big = []
+    ycent_big = []
+    wcent_big = []
+
+    # # loop over every HeNeAr peak that had a good fit
+    # for i in range(len(pcent)):
+    #     # the valid y-range of the chip
+    #     ydata = np.arange(img.shape[0])
+    #
+    #     # boxdata = img[:, pcent[i]-maxbend:pcent[i]+maxbend]
+    #     popt,pcov = curve_fit(gauss, )
+
 #     # scipy.interpolate.SmoothBivariateSpline
 #     treat the wavelenth solution as a surface
 
@@ -391,5 +442,6 @@ img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
 #autoreduce('robj.lis','rflat.lis', 'rbias.lis', trim=True, display=False)
 
-HeNeAr_fit('example_data/HeNeAr.0028b.fits')
+#HeNeAr_fit('example_data/HeNeAr.0028b.fits')
+# HeNeAr_fit('dishi2_HeNeAr.0101b.fits')
 HeNeAr_fit('example_data/HeNeAr.0027r.fits')

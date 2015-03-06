@@ -143,7 +143,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist=1, trim=True, display=True):
+def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, display=True):
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -192,28 +192,47 @@ def HeNeAr_fit(calimage, linelist=1, trim=True, display=True):
         plt.plot(wtemp, np.ones_like(slice)*np.median(slice))
         plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
 
-    pcent_pix = np.zeros_like(pk)
-    wcent_pix = np.zeros_like(pk)
+    pcent_pix = np.zeros_like(pk,dtype='float')
+    wcent_pix = np.zeros_like(pk,dtype='float') # wtemp[pk]
     # for each peak, fit a gaussian to find center
     for i in range(len(pk)):
-        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*1]
-        yi = slice[pk[i]-pwidth:pk[i]+pwidth*1]
+        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
+        yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
 
-        popt,pcov = curve_fit(gaus, xi, yi, p0=(np.amax(yi), np.median(slice), xi[np.argmax(yi)], 2.))
+        popt,pcov = curve_fit(gaus, np.arange(len(xi),dtype='float'), yi,
+                              p0=(np.amax(yi), np.median(slice), float(np.argmax(yi)), 2.))
 
-        pcent_pix[i] = popt[2]
+        # the gaussian center of the line in pixel units
+        pcent_pix[i] = (pk[i]-pwidth) + popt[2]
+        # and the peak in wavelength units
+        wcent_pix[i] = xi[np.argmax(yi)]
 
         if display is True:
             plt.scatter(wtemp[pk], slice[pk], marker='o')
-            plt.plot(xi, gaus(xi,*popt), 'r')
+            plt.plot(xi, gaus(np.arange(len(xi)),*popt), 'r')
     if display is True:
         plt.xlabel('approx. wavelength')
         plt.ylabel('flux')
-        plt.show()
+        #plt.show()
 
 
 
     # then match to best guess from linelist
+    linewave = np.loadtxt(linelist,dtype='float')
+
+    if display is True:
+        plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='|',c='blue')
+        plt.show()
+
+
+#   loop thru each peak, from center outwards
+#       find nearest list line. if not line within tolerance, then skip peak
+#       use updated list of matched peaks to interpolate all peaks wavelength spline
+#     pcent = []
+#     wcent = []
+#     ss = np.argsort(np.abs(wcent_pix-wcen_approx))
+#     for i in range(len(pcent_pix)):
+#         np.abs(wcent_pix[ss][i] - linewave)
 
 
 #     trace the peaks vertically, allow curve, spline as before

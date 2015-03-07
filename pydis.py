@@ -221,11 +221,10 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt',
 
 
     # import the linelist to match against
-    linewave,peakwave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,1),unpack=True)
+    linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,1),unpack=True)
 
     if display is True:
-        #plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='blue')
-        plt.scatter(linewave,peakwave,marker='o',c='cyan')
+        plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='blue')
         plt.show()
 
 #   loop thru each peak, from center outwards. a greedy solution

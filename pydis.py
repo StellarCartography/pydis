@@ -45,6 +45,7 @@ Things I'm not going to worry about:
 from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
@@ -143,7 +144,8 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, fmask=(1,), display=True):
+def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt',
+               trim=True, fmask=(1,), display=True):
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -163,7 +165,9 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, fmask=(1,),
     else:
         sign = 1.0
 
-    # take a slice thru the data (+/- 10 pixels)
+    hdu.close(closed=True)
+
+    # take a slice thru the data (+/- 10 pixels) in center row of chip
     slice = img[img.shape[0]/2-10:img.shape[0]/2+10,:].sum(axis=0)
 
     # use the header info to do rough solution (linear guess)
@@ -259,8 +263,6 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, fmask=(1,),
                 plt.scatter(wcent,np.ones_like(wcent)*np.max(slice),marker='o',c='red')
 
             if (len(pcent)>w1d_order):
-                # print('re-fitting')
-                # print(coeff)
                 coeff = np.polyfit(pcent-len(slice)/2,wcent, w1d_order)
 
         if display is True:
@@ -286,45 +288,66 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, fmask=(1,),
     else:
         ydata = np.arange(img.shape[0])
 
+    # split the chip in to 2 parts, above and below the center
+    ydata1 = ydata[np.where((ydata>=img.shape[0]/2))]
+    ydata2 = ydata[np.where((ydata<img.shape[0]/2))][::-1]
 
     img_med = np.median(img)
     # loop over every HeNeAr peak that had a good fit
+
     for i in range(len(pcent)):
         xline = np.arange(int(pcent[i])-maxbend,int(pcent[i])+maxbend)
 
-        for j in ydata:
+        # above center line (where fit was done)
+        for j in ydata1:
             yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
             # fit gaussian, assume center at 0, width of 2
-            if j==min(ydata):
+            if j==ydata1[0]:
                 cguess = pcent[i] # xline[np.argmax(yline)]
+
             pguess = [np.amax(yline),img_med,cguess,2.]
-
             popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
+            cguess = popt[2] # update center pixel
 
-            cguess = popt[2]
+            xcent_big = np.append(xcent_big, popt[2])
+            ycent_big = np.append(ycent_big, j)
+            wcent_big = np.append(wcent_big, wcent[i])
+        # below center line, from middle down
+        for j in ydata2:
+            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
+            # fit gaussian, assume center at 0, width of 2
+            if j==ydata1[0]:
+                cguess = pcent[i] # xline[np.argmax(yline)]
+
+            pguess = [np.amax(yline),img_med,cguess,2.]
+            popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
+            cguess = popt[2] # update center pixel
 
             xcent_big = np.append(xcent_big, popt[2])
             ycent_big = np.append(ycent_big, j)
             wcent_big = np.append(wcent_big, wcent[i])
 
-    # plt.figure()
-    # plt.imshow(np.log10(img), origin = 'lower',aspect='auto')
-    # plt.colorbar()
-    # plt.scatter(xcent_big,ycent_big,marker='o',c='k')
-    # plt.show()
+    if display is True:
+        plt.figure()
+        plt.imshow(np.log10(img), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
+        plt.colorbar()
+        plt.scatter(xcent_big,ycent_big,marker='|',c='r')
+        plt.show()
 
+    #-- now the big show!
+    #  fit the wavelength solution for the entire chip w/ a 2d spline
+    xfitd = 3 # the spline dimension in the wavelength space
+    print('Fitting Spline!')
+    wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
+                                 bbox=[0,img.shape[1],0,img.shape[0]] )
 
-#     # scipy.interpolate.SmoothBivariateSpline
-#     treat the wavelenth solution as a surface
-
-
-    hdu.close(closed=True)
-    return #wavemap
+    return wfit
 
 ##########################
-# def mapwavelength(trace, wavemap):
-#     use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
-#     return trace_wave
+def mapwavelength(trace, wavemap):
+    # use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
+    trace_wave = wavemap.ev(np.arange(len(trace)), trace)
+    return trace_wave
 
 
 #########################
@@ -400,16 +423,18 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(flat)
     hduOut.writeto(output, clobber=True)
-    return flat ,ok
+    return flat ,ok[0]
 # i want to return the flat "OK" mask to use later,
-# but only optionally.... need to make a flat class. later...
+# but only optionally.... need to make a flat class!
 
 
 #########################
-def autoreduce(speclist, flatlist, biaslist, trim=True, write_reduced=True, display=True):
+def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
+               trim=True, write_reduced=True, display=True):
+
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)
-    flat,fmask = flatcombine(flatlist, bias, trim=True)
+    flat,fmask_out = flatcombine(flatlist, bias, trim=True)
 
     specfile = np.loadtxt(speclist,dtype='string')
 
@@ -435,40 +460,40 @@ def autoreduce(speclist, flatlist, biaslist, trim=True, write_reduced=True, disp
         # measure sky values along trace
         sky = sky_fit(data, trace, apwidth=3)
 
+        xbins = np.arange(data.shape[1])
         if display is True:
             plt.figure()
             plt.imshow(np.log10(data), origin = 'lower',aspect='auto')
             plt.colorbar()
-            plt.plot(np.arange(data.shape[1]), trace,'k',lw=1)
-            plt.plot(np.arange(data.shape[1]), trace-3.,'r',lw=1)
-            plt.plot(np.arange(data.shape[1]), trace+3.,'r',lw=1)
+            plt.plot(xbins, trace,'k',lw=1)
+            plt.plot(xbins, trace-3.,'r',lw=1)
+            plt.plot(xbins, trace+3.,'r',lw=1)
             plt.show()
 
         # write output file for extracted spectrum
         if write_reduced is True:
             np.savetxt(spec+'.apextract',ext_spec-sky)
 
-    return #ext_spec, sky, data, raw, bias, flat, trace
+        wfit = HeNeAr_fit(HeNeAr_file,trim=True,fmask=fmask_out,display=False)
+
+        wfinal = mapwavelength(trace,wfit)
+
+        plt.figure()
+        plt.plot(wfinal, ext_spec-sky)
+        plt.xlabel('Wavelength')
+        plt.ylabel('Counts')
+        plt.show()
+
+    return
 
 
 
 #########################
 #  Test Data / Examples
 #########################
-datafile = 'example_data/Gliese176.0052b.fits'
-flatfile = 'example_data/flat.0039b.fits'
-biasfile = 'example_data/bias.0014b.fits'
 
-hdu = fits.open( datafile )
+# autoreduce('robj.lis','rflat.lis', 'rbias.lis','example_data/HeNeAr.0027r.fits',
+#            trim=True, display=False)
 
-# trim the data to remove overscan region
-datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-d = map(float, datasec)
-
-img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
-
-#autoreduce('robj.lis','rflat.lis', 'rbias.lis', trim=True, display=False)
-
-#HeNeAr_fit('example_data/HeNeAr.0027r.fits')
-# HeNeAr_fit('dishi2_HeNeAr.0101b.fits')
-HeNeAr_fit('example_data/HeNeAr.0028b.fits',fmask=np.arange(10,285),display=False)
+# autoreduce('bobj.lis','bflat.lis', 'bbias.lis','example_data/HeNeAr.0028b.fits',
+#            trim=True, display=False)

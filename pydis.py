@@ -143,7 +143,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, display=True):
+def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, fmask=(1,), display=True):
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -280,16 +280,43 @@ def HeNeAr_fit(calimage, linelist='dishigh_linelist.txt', trim=True, display=Tru
     ycent_big = []
     wcent_big = []
 
-    # # loop over every HeNeAr peak that had a good fit
-    # for i in range(len(pcent)):
-    #     # the valid y-range of the chip
-    #     ydata = np.arange(img.shape[0])
-    #
-    #     # boxdata = img[:, pcent[i]-maxbend:pcent[i]+maxbend]
-    #     popt,pcov = curve_fit(gauss, )
+    # the valid y-range of the chip
+    if (len(fmask)>1):
+        ydata = np.arange(img.shape[0])[fmask]
+    else:
+        ydata = np.arange(img.shape[0])
+
+
+    img_med = np.median(img)
+    # loop over every HeNeAr peak that had a good fit
+    for i in range(len(pcent)):
+        xline = np.arange(int(pcent[i])-maxbend,int(pcent[i])+maxbend)
+
+        for j in ydata:
+            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
+            # fit gaussian, assume center at 0, width of 2
+            if j==min(ydata):
+                cguess = pcent[i] # xline[np.argmax(yline)]
+            pguess = [np.amax(yline),img_med,cguess,2.]
+
+            popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
+
+            cguess = popt[2]
+
+            xcent_big = np.append(xcent_big, popt[2])
+            ycent_big = np.append(ycent_big, j)
+            wcent_big = np.append(wcent_big, wcent[i])
+
+    # plt.figure()
+    # plt.imshow(np.log10(img), origin = 'lower',aspect='auto')
+    # plt.colorbar()
+    # plt.scatter(xcent_big,ycent_big,marker='o',c='k')
+    # plt.show()
+
 
 #     # scipy.interpolate.SmoothBivariateSpline
 #     treat the wavelenth solution as a surface
+
 
     hdu.close(closed=True)
     return #wavemap
@@ -373,7 +400,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(flat)
     hduOut.writeto(output, clobber=True)
-    return flat #,ok
+    return flat ,ok
 # i want to return the flat "OK" mask to use later,
 # but only optionally.... need to make a flat class. later...
 
@@ -382,7 +409,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
 def autoreduce(speclist, flatlist, biaslist, trim=True, write_reduced=True, display=True):
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)
-    flat = flatcombine(flatlist, bias, trim=True)
+    flat,fmask = flatcombine(flatlist, bias, trim=True)
 
     specfile = np.loadtxt(speclist,dtype='string')
 
@@ -442,6 +469,6 @@ img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
 #autoreduce('robj.lis','rflat.lis', 'rbias.lis', trim=True, display=False)
 
-#HeNeAr_fit('example_data/HeNeAr.0028b.fits')
+#HeNeAr_fit('example_data/HeNeAr.0027r.fits')
 # HeNeAr_fit('dishi2_HeNeAr.0101b.fits')
-HeNeAr_fit('example_data/HeNeAr.0027r.fits')
+HeNeAr_fit('example_data/HeNeAr.0028b.fits',fmask=np.arange(10,285),display=False)

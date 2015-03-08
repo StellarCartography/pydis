@@ -86,11 +86,6 @@ def ap_trace(img, fmask=(1,), nsteps=100):
         yi = np.arange(img.shape[0])[ydata]
         pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
         popt,pcov = curve_fit(gaus, yi, zi, p0=pguess)
-        #plt.figure()#
-        #plt.plot(yi,zi)#
-        #plt.show()#
-        #print(pguess)#
-        #print(popt)#
         
         ybins[i] = popt[2]
 
@@ -205,8 +200,9 @@ def HeNeAr_fit(calimage, linelist='',
         xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
         yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
 
+        pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
         popt,pcov = curve_fit(gaus, np.arange(len(xi),dtype='float'), yi,
-                              p0=(np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.))
+                              p0=pguess)
 
         # the gaussian center of the line in pixel units
         pcent_pix[i] = (pk[i]-pwidth) + popt[2]

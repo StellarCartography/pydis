@@ -57,26 +57,19 @@ def gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 #########################
-def ap_trace(img, nsteps=100):
-    '''
-    Aperture finding and tracing
-
-    Parameters
-    ----------
-    img : 2d numpy array, required
-        the input image, already trimmed
-
-    Returns
-    -------
-    1d numpy array, y positions of the trace
-
-    '''
+def ap_trace(img, fmask=(1,), nsteps=100):
     #--- find the overall max row, and width
     # comp_y = img.sum(axis=1)
     # peak_y = np.argmax(comp_y)
     # popt,pcov = curve_fit(gaus, np.arange(len(comp_y)), comp_y,
     #                       p0=[np.amax(comp_y), np.median(comp_y), peak_y, 2.])
     # peak_dy = popt[3]    
+
+    # the valid y-range of the chip
+    if (len(fmask)>1):
+        ydata = np.arange(img.shape[0])[fmask]
+    else:
+        ydata = np.arange(img.shape[0])
 
     # median smooth to crudely remove cosmic rays
     img_sm = scipy.signal.medfilt2d(img, kernel_size=(5,5))
@@ -87,11 +80,18 @@ def ap_trace(img, nsteps=100):
     for i in range(0,len(xbins)-1):
         #-- simply use the max w/i each window
         #ybins[i] = np.argmax(img_sm[:,xbins[i]:xbins[i+1]].sum(axis=1))
-
+        
         #-- fit gaussian w/i each window
-        zi = img_sm[:,xbins[i]:xbins[i+1]].sum(axis=1)
-        yi = np.arange(len(zi))
-        popt,pcov = curve_fit(gaus, yi, zi, p0=[np.amax(zi), np.median(zi), np.argmax(zi), 2.])
+        zi = img_sm[ydata, xbins[i]:xbins[i+1]].sum(axis=1)
+        yi = np.arange(img.shape[0])[ydata]
+        pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
+        popt,pcov = curve_fit(gaus, yi, zi, p0=pguess)
+        #plt.figure()#
+        #plt.plot(yi,zi)#
+        #plt.show()#
+        #print(pguess)#
+        #print(popt)#
+        
         ybins[i] = popt[2]
 
     # recenter the bin positions, trim the unused bin off in Y
@@ -134,6 +134,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
         itrace = int(trace[i])
         y = np.append(np.arange(itrace-skysep-skywidth, itrace-skysep),
                       np.arange(itrace+skysep, itrace+skysep+skywidth))
+
         z = img[y,i]
         # fit a polynomial to the sky in this column
         pfit = np.polyfit(y,z,skydeg)
@@ -205,12 +206,12 @@ def HeNeAr_fit(calimage, linelist='',
         yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
 
         popt,pcov = curve_fit(gaus, np.arange(len(xi),dtype='float'), yi,
-                              p0=(np.amax(yi), np.median(slice), float(np.argmax(yi)), 2.))
+                              p0=(np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.))
 
         # the gaussian center of the line in pixel units
         pcent_pix[i] = (pk[i]-pwidth) + popt[2]
         # and the peak in wavelength units
-        wcent_pix[i] = xi[np.argmax(yi)]
+        wcent_pix[i] = xi[np.nanargmax(yi)]
 
         if display is True:
             plt.scatter(wtemp[pk][i], slice[pk][i], marker='o')
@@ -228,7 +229,7 @@ def HeNeAr_fit(calimage, linelist='',
     linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
 
     if display is True:
-        plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='blue')
+        plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='blue')
         plt.show()
 
 #   loop thru each peak, from center outwards. a greedy solution
@@ -253,9 +254,9 @@ def HeNeAr_fit(calimage, linelist='',
         if display is True:
             plt.figure()
             plt.plot(wtemp, slice, 'b')
-            plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='cyan')
-            plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.max(slice)/2.,marker='*',c='green')
-            plt.scatter(wcent_pix[ss[i]],np.max(slice)/2.,marker='o',c='orange')
+            plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
+            plt.scatter(wcent_pix,np.ones_like(wcent_pix)*npnan.max(slice)/2.,marker='*',c='green')
+            plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2.,marker='o',c='orange')
         # if there is a match w/i the linear tolerance
         if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
             # add corresponding pixel and *actual* wavelength to output vectors
@@ -263,7 +264,7 @@ def HeNeAr_fit(calimage, linelist='',
             wcent = np.append(wcent, linewave[np.argmin(np.abs(wcent_pix[ss[i]] - linewave))] )
 
             if display is True:
-                plt.scatter(wcent,np.ones_like(wcent)*np.max(slice),marker='o',c='red')
+                plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
 
             if (len(pcent)>w1d_order):
                 coeff = np.polyfit(pcent-len(slice)/2,wcent, w1d_order)
@@ -308,7 +309,7 @@ def HeNeAr_fit(calimage, linelist='',
             if j==ydata1[0]:
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
-            pguess = [np.amax(yline),img_med,cguess,2.]
+            pguess = [np.nanmax(yline),img_med,cguess,2.]
             popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
             cguess = popt[2] # update center pixel
 
@@ -322,7 +323,7 @@ def HeNeAr_fit(calimage, linelist='',
             if j==ydata1[0]:
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
-            pguess = [np.amax(yline),img_med,cguess,2.]
+            pguess = [np.nanmax(yline),img_med,cguess,2.]
             popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
             cguess = popt[2] # update center pixel
 
@@ -454,8 +455,21 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # remove bias and flat
         data = (raw - bias) / flat
 
+        if display is True:
+            plt.figure()
+            plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
+            plt.title(spec+' (flat and bias corrected)')
+            plt.show()
+
         # with reduced data, trace the aperture
-        trace = ap_trace(data, nsteps=50)
+        trace = ap_trace(data,fmask=fmask_out, nsteps=50)
+
+        if display is True:
+            plt.figure()
+            plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
+            plt.plot(np.arange(len(trace)),trace,'r')
+            plt.title(spec+' (with trace)')
+            plt.show()
 
         # extract the spectrum
         ext_spec = ap_extract(data, trace, apwidth=3)
@@ -471,6 +485,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.plot(xbins, trace,'k',lw=1)
             plt.plot(xbins, trace-3.,'r',lw=1)
             plt.plot(xbins, trace+3.,'r',lw=1)
+            plt.title('(with trace and aperture region)')
             plt.show()
 
         # write output file for extracted spectrum

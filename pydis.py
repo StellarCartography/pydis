@@ -222,10 +222,10 @@ def HeNeAr_fit(calimage, linelist='',
 
     if (len(linelist)==0):
         dir = os.path.dirname(os.path.realpath(__file__))
-        linelist = dir + '/dishigh_linelist.txt'
+        linelist = dir + '/resources/dishigh_linelist.txt'
 
     # import the linelist to match against
-    linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,1),unpack=True)
+    linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
 
     if display is True:
         plt.scatter(linewave,np.ones_like(linewave)*np.max(slice),marker='o',c='blue')
@@ -485,6 +485,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         plt.plot(wfinal, ext_spec-sky)
         plt.xlabel('Wavelength')
         plt.ylabel('Counts')
+        plt.title(spec)
         plt.show()
 
     return

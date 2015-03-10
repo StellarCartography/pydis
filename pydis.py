@@ -251,8 +251,8 @@ def HeNeAr_fit(calimage, linelist='',
             plt.figure()
             plt.plot(wtemp, slice, 'b')
             plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
-            plt.scatter(wcent_pix,np.ones_like(wcent_pix)*npnan.max(slice)/2.,marker='*',c='green')
-            plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2.,marker='o',c='orange')
+            plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
+            plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
         # if there is a match w/i the linear tolerance
         if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
             # add corresponding pixel and *actual* wavelength to output vectors

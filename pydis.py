@@ -430,6 +430,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
+               apwidth=3,skysep=25,skywidth=75,
                trim=True, write_reduced=True, display=True):
 
     # assume specfile is a list of file names of object
@@ -469,10 +470,10 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.show()
 
         # extract the spectrum
-        ext_spec = ap_extract(data, trace, apwidth=3)
+        ext_spec = ap_extract(data, trace, apwidth=apwidth)
 
         # measure sky values along trace
-        sky = sky_fit(data, trace, apwidth=3)
+        sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,skywidth=skywidth)
 
         xbins = np.arange(data.shape[1])
         if display is True:
@@ -489,9 +490,15 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         if write_reduced is True:
             np.savetxt(spec+'.apextract',ext_spec-sky)
 
-        wfit = HeNeAr_fit(HeNeAr_file,trim=True,fmask=fmask_out,display=False)
+        wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out, display=display)
 
-        wfinal = mapwavelength(trace,wfit)
+        wfinal = mapwavelength(trace, wfit)
+
+        if write_reduced is True:
+            fout = open(spec+'.spec','w')
+            for k in range(len(wfinal)):
+                fout.write(str(wfinal[k]) + ', ' + str(ext_spec[k]-sky[k]) + '\n')
+            fout.close()
 
         plt.figure()
         plt.plot(wfinal, ext_spec-sky)
@@ -513,3 +520,9 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
 # autoreduce('bobj.lis','bflat.lis', 'bbias.lis','example_data/HeNeAr.0028b.fits',
 #            trim=True, display=False)
+
+#
+# pydis.autoreduce('objlist','flatlist', 'biaslist',
+#                  '05may31.0035r.fits',
+#                  apwidth=6,skysep=50,skywidth=50,
+#                  trim=True, display=False)

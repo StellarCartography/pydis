@@ -123,7 +123,7 @@ def ap_extract(img, trace, apwidth=5.0):
 def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
     # do simple parabola fit at each pixel
     # (assume wavelength axis is perfectly vertical)
-    # return 1-d sky values
+    # return 1-d sky values along trace
     skysubflux = np.zeros_like(trace)
     for i in range(0,len(trace)):
         itrace = int(trace[i])
@@ -436,16 +436,17 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     bias = biascombine(biaslist, trim = True)
     flat,fmask_out = flatcombine(flatlist, bias, trim=True)
 
+    # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')
 
     for spec in specfile:
         hdu = fits.open(spec)
-        if trim is False:
-            raw = hdu[0].data
         if trim is True:
             datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
             d = map(float, datasec)
             raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+        else:
+            raw = hdu[0].data
         hdu.close(closed=True)
 
         # remove bias and flat

@@ -58,6 +58,7 @@ def gaus(x,a,b,x0,sigma):
 
 #########################
 def ap_trace(img, fmask=(1,), nsteps=100):
+    print('Tracing Aperture using nsteps='+str(nsteps))
     #--- find the overall max row, and width
     # comp_y = img.sum(axis=1)
     # peak_y = np.argmax(comp_y)

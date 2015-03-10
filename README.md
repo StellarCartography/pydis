@@ -11,8 +11,7 @@ Really slick tools exist for on-the-fly photometry analysis. However, no turn-ke
 
 - Being able to extract and see data in real time at the telescope would be extremely helpful!
 - This pipeline doesn't have to give perfect results to be very useful
-- We cannot beat IRAF at it's own game. IRAF is the industry standard
-- Don't try to build a One Size Fits All solution for every possible instrument or science case
+- Don't try to build a *One Size Fits All* solution for every possible instrument or science case. We cannot beat IRAF at it's own game. IRAF is the industry standard
 - The pipeline does need to handle:
 	- Flats 
 	- Biases 
@@ -26,6 +25,11 @@ Really slick tools exist for on-the-fly photometry analysis. However, no turn-ke
 
 So far `pyDIS` can do a rough job of all the reduction tasks, except flux calibration, for single point sources. No interactive mode is currently available for any task.
 
+
+### Current Status
+pyDIS is doing a pretty good job at getting the general properties for medium-to-good S/N spectra. We are currently seeking more data to test it against, to help refine the solution and find bugs.
+
+![Imgur](http://i.imgur.com/IjXdt39l.png)
 
 ### How to Help
 Check out the Issues page if you think you can help code! Or if you have some data already reduced that you trust and would be willing to share, let us know!

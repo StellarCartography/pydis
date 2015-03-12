@@ -441,7 +441,8 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                apwidth=3,skysep=25,skywidth=75, ntracesteps=50,
-               trim=True, write_reduced=True, display=True):
+               trim=True, write_reduced=True, display=True,
+               trace1=False):
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)
@@ -453,7 +454,9 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')
 
-    for spec in specfile:
+    for i in range(len(specfile)):
+        spec = specfile[i]
+
         hdu = fits.open(spec)
         if trim is True:
             datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
@@ -473,7 +476,9 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.show()
 
         # with reduced data, trace the aperture
-        trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
+        if (i==0) or (trace1 is False):
+            trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
+
 
         if display is True:
             plt.figure()

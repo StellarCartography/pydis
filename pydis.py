@@ -59,13 +59,6 @@ def gaus(x,a,b,x0,sigma):
 #########################
 def ap_trace(img, fmask=(1,), nsteps=100):
     print('Tracing Aperture using nsteps='+str(nsteps))
-    #--- find the overall max row, and width
-    # comp_y = img.sum(axis=1)
-    # peak_y = np.argmax(comp_y)
-    # popt,pcov = curve_fit(gaus, np.arange(len(comp_y)), comp_y,
-    #                       p0=[np.amax(comp_y), np.median(comp_y), peak_y, 2.])
-    # peak_dy = popt[3]    
-
     # the valid y-range of the chip
     if (len(fmask)>1):
         ydata = np.arange(img.shape[0])[fmask]
@@ -75,20 +68,31 @@ def ap_trace(img, fmask=(1,), nsteps=100):
     # median smooth to crudely remove cosmic rays
     img_sm = scipy.signal.medfilt2d(img, kernel_size=(5,5))
 
+    #--- find the overall max row, and width
+    ztot = img_sm.sum(axis=1)[ydata]
+    yi = np.arange(img.shape[0])[ydata]
+    peak_y = yi[np.nanargmax(ztot)]
+    popt_tot,pcov = curve_fit(gaus, yi, ztot,
+                          p0=[np.nanmax(ztot), np.median(ztot), peak_y, 2.])
+
     # define the bin edges
     xbins = np.linspace(0, img.shape[1], nsteps)
     ybins = np.zeros_like(xbins)
+
     for i in range(0,len(xbins)-1):
         #-- simply use the max w/i each window
         #ybins[i] = np.argmax(img_sm[:,xbins[i]:xbins[i+1]].sum(axis=1))
         
         #-- fit gaussian w/i each window
         zi = img_sm[ydata, xbins[i]:xbins[i+1]].sum(axis=1)
-        yi = np.arange(img.shape[0])[ydata]
         pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
         popt,pcov = curve_fit(gaus, yi, zi, p0=pguess)
-        
-        ybins[i] = popt[2]
+
+        # if gaussian fits off chip, then use chip-integrated answer
+        if (popt[2] <= min(ydata)+25) or (popt[2] >= max(ydata)-25):
+            ybins[i] = popt_tot[2]
+        else:
+            ybins[i] = popt[2]
 
     # recenter the bin positions, trim the unused bin off in Y
     mxbins = (xbins[:-1] + xbins[1:])/2.
@@ -431,7 +435,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-               apwidth=3,skysep=25,skywidth=75,
+               apwidth=3,skysep=25,skywidth=75, ntracesteps=50,
                trim=True, write_reduced=True, display=True):
 
     # assume specfile is a list of file names of object
@@ -461,7 +465,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.show()
 
         # with reduced data, trace the aperture
-        trace = ap_trace(data,fmask=fmask_out, nsteps=50)
+        trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
 
         if display is True:
             plt.figure()

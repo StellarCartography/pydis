@@ -151,7 +151,9 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 ##########################
 def HeNeAr_fit(calimage, linelist='',
-               trim=True, fmask=(1,), display=True):
+               trim=True, fmask=(1,), display=True,
+               tol=10,fit_order=2):
+
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -245,11 +247,8 @@ def HeNeAr_fit(calimage, linelist='',
     # find center-most lines, sort by dist from center pixels
     ss = np.argsort(np.abs(wcent_pix-wcen_approx))
 
-    tol = 20. # angstroms... might need to make more flexible?
-    w1d_order = 2 # the polynomial order for the 1d wavelength solution
-
     #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
-    coeff = np.append(np.zeros(w1d_order-1),(disp_approx*sign, wcen_approx))
+    coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
 
     for i in range(len(pcent_pix)):
         xx = pcent_pix-len(slice)/2
@@ -272,8 +271,8 @@ def HeNeAr_fit(calimage, linelist='',
             if display is True:
                 plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
 
-            if (len(pcent)>w1d_order):
-                coeff = np.polyfit(pcent-len(slice)/2, wcent, w1d_order)
+            if (len(pcent)>fit_order):
+                coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
 
         if display is True:
             plt.xlim((min(wtemp),max(wtemp)))
@@ -440,16 +439,18 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-               apwidth=3,skysep=25,skywidth=75, ntracesteps=50,
-               trim=True, write_reduced=True, display=True,
-               trace1=False):
+               trace1=False, ntracesteps=25,
+               apwidth=3,skysep=25,skywidth=75,
+               HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
+               trim=True, write_reduced=True, display=True):
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)
     flat,fmask_out = flatcombine(flatlist, bias, trim=True)
 
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out, display=display)
+    wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out,
+                      display=displayHeNeAr,tol=HeNeAr_tol,fit_order=HeNeAr_order)
 
     # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')

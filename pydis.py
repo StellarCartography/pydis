@@ -57,13 +57,17 @@ def gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 #########################
-def ap_trace(img, fmask=(1,), nsteps=100):
+def ap_trace(img, fmask=(1,), nsteps=50):
     print('Tracing Aperture using nsteps='+str(nsteps))
     # the valid y-range of the chip
     if (len(fmask)>1):
         ydata = np.arange(img.shape[0])[fmask]
     else:
         ydata = np.arange(img.shape[0])
+
+    # need at least 4 samples along the trace. sometimes can get away with very few
+    if (nsteps<4):
+        nsteps = 4
 
     # median smooth to crudely remove cosmic rays
     img_sm = scipy.signal.medfilt2d(img, kernel_size=(5,5))

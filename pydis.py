@@ -99,7 +99,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
             ybins[i] = popt[2]
 
     # recenter the bin positions, trim the unused bin off in Y
-    mxbins = (xbins[:-1] + xbins[1:])/2.
+    mxbins = (xbins[:-1]+xbins[1:]) / 2.
     mybins = ybins[:-1]
 
     # run a cubic spline thru the bins
@@ -245,8 +245,8 @@ def HeNeAr_fit(calimage, linelist='',
     # find center-most lines, sort by dist from center pixels
     ss = np.argsort(np.abs(wcent_pix-wcen_approx))
 
-    tol = 15. # angstroms... might need to make more flexible?
-    w1d_order = 3 # the polynomial order for the 1d wavelength solution
+    tol = 20. # angstroms... might need to make more flexible?
+    w1d_order = 2 # the polynomial order for the 1d wavelength solution
 
     #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
     coeff = np.append(np.zeros(w1d_order-1),(disp_approx*sign, wcen_approx))
@@ -262,6 +262,7 @@ def HeNeAr_fit(calimage, linelist='',
             plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
             plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
             plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
+
         # if there is a match w/i the linear tolerance
         if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
             # add corresponding pixel and *actual* wavelength to output vectors
@@ -272,7 +273,7 @@ def HeNeAr_fit(calimage, linelist='',
                 plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
 
             if (len(pcent)>w1d_order):
-                coeff = np.polyfit(pcent-len(slice)/2,wcent, w1d_order)
+                coeff = np.polyfit(pcent-len(slice)/2, wcent, w1d_order)
 
         if display is True:
             plt.xlim((min(wtemp),max(wtemp)))
@@ -446,6 +447,9 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     bias = biascombine(biaslist, trim = True)
     flat,fmask_out = flatcombine(flatlist, bias, trim=True)
 
+    # do the HeNeAr mapping first, must apply to all science frames
+    wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out, display=display)
+
     # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')
 
@@ -498,8 +502,6 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # write output file for extracted spectrum
         if write_reduced is True:
             np.savetxt(spec+'.apextract',ext_spec-sky)
-
-        wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out, display=display)
 
         wfinal = mapwavelength(trace, wfit)
 

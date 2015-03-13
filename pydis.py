@@ -50,6 +50,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
 import scipy.signal
+import datetime
 import os
 #import itertools
 
@@ -538,22 +539,52 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.show()
 
         # write output file for extracted spectrum
-        if write_reduced is True:
-            np.savetxt(spec+'.apextract',ext_spec-sky)
+        # if write_reduced is True:
+        #     np.savetxt(spec+'.apextract',ext_spec-sky)
 
         wfinal = mapwavelength(trace, wfit)
 
         if write_reduced is True:
+            # write file with the trace (y positions)
+            tout = open(spec+'.trace','w')
+            tout.write('#  This file contains the x,y coordinates of the trace \n')
+            for k in range(len(trace)):
+                tout.write(str(k)+', '+str(trace[k]) + '\n')
+            tout.close()
+
+            # write the final spectrum out
             fout = open(spec+'.spec','w')
+            fout.write('#  This file contains the final extracted wavelength,counts data \n')
             for k in range(len(wfinal)):
                 fout.write(str(wfinal[k]) + ', ' + str(ext_spec[k]-sky[k]) + '\n')
             fout.close()
 
+            now = datetime.datetime.now()
+
+            lout = open(spec+'.log','w')
+            lout.write('#  This file contains data on the reduction parameters \n'+
+                       '#  used for '+spec+'\n')
+            lout.write('DATE-REDUCED = '+str(now)+'\n')
+            lout.write('HeNeAr_tol   = '+str(HeNeAr_tol)+'\n')
+            lout.write('HeNeAr_order = '+str(HeNeAr_order)+'\n')
+            lout.write('trace1       = '+str(trace1)+'\n')
+            lout.write('ntracesteps  = '+str(ntracesteps)+'\n')
+            lout.write('apwidth      = '+str(apwidth)+'\n')
+            lout.write('skysep       = '+str(skysep)+'\n')
+            lout.write('skywidth     = '+str(skywidth)+'\n')
+            lout.write('trim         = '+str(trim)+'\n')
+            lout.close()
+
+
+        # the final figure to plot
         plt.figure()
         plt.plot(wfinal, ext_spec-sky)
         plt.xlabel('Wavelength')
         plt.ylabel('Counts')
         plt.title(spec)
+        #plot within percentile limits
+        plt.ylim( (np.percentile(ext_spec-sky,2),
+                   np.percentile(ext_spec-sky,98)) )
         plt.show()
 
     return

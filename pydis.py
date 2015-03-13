@@ -42,6 +42,8 @@ Things I'm not going to worry about:
 
 """
 
+import matplotlib
+matplotlib.use('QT4Agg')
 from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
@@ -173,11 +175,12 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist='', interac=True,
+def HeNeAr_fit(calimage, linelist='', interac=False,
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
 
     print('Running HeNeAr_fit...')
+
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -196,7 +199,6 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         sign = -1.0
     else:
         sign = 1.0
-
     hdu.close(closed=True)
 
     # take a slice thru the data (+/- 10 pixels) in center row of chip
@@ -205,104 +207,112 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
-    # sort data, cut top x% of flux data as peak threshold
-    flux_thresh = np.percentile(slice, 97)
-
-    # find flux above threshold
-    high = np.where( (slice >= flux_thresh) )
-
-    # find  individual peaks (separated by > 1 pixel)
-    pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
-
-    # the number of pixels around the "peak" to fit over
-    pwidth = 10
-    # offset from start/end of array by at least same # of pixels
-    pk = pk[pk > pwidth]
-    pk = pk[pk < (len(slice)-pwidth)]
-
-    if display is True:
-        plt.figure()
-        plt.plot(wtemp, slice, 'b')
-        plt.plot(wtemp, np.ones_like(slice)*np.median(slice))
-        plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
-
-    pcent_pix = np.zeros_like(pk,dtype='float')
-    wcent_pix = np.zeros_like(pk,dtype='float') # wtemp[pk]
-    # for each peak, fit a gaussian to find center
-    for i in range(len(pk)):
-        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
-        yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
-
-        pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-        popt,pcov = curve_fit(gaus, np.arange(len(xi),dtype='float'), yi,
-                              p0=pguess)
-
-        # the gaussian center of the line in pixel units
-        pcent_pix[i] = (pk[i]-pwidth) + popt[2]
-        # and the peak in wavelength units
-        wcent_pix[i] = xi[np.nanargmax(yi)]
-
-        if display is True:
-            plt.scatter(wtemp[pk][i], slice[pk][i], marker='o')
-            plt.plot(xi, gaus(np.arange(len(xi)),*popt), 'r')
-    if display is True:
-        plt.xlabel('approx. wavelength')
-        plt.ylabel('flux')
-        #plt.show()
-
+    # find the linelist of choice
     if (len(linelist)==0):
         dir = os.path.dirname(os.path.realpath(__file__))
         linelist = dir + '/resources/dishigh_linelist.txt'
 
-    # import the linelist to match against
+    # import the linelist
     linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
 
-    if display is True:
-        plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='blue')
-        plt.show()
 
-#   loop thru each peak, from center outwards. a greedy solution
-#   find nearest list line. if not line within tolerance, then skip peak
-    pcent = []
-    wcent = []
+    ######   IDENTIFY   (auto and interac modes)
+    if interac is False:
+        # sort data, cut top x% of flux data as peak threshold
+        flux_thresh = np.percentile(slice, 97)
 
-    # find center-most lines, sort by dist from center pixels
-    ss = np.argsort(np.abs(wcent_pix-wcen_approx))
+        # find flux above threshold
+        high = np.where( (slice >= flux_thresh) )
 
-    #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
-    coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
+        # find  individual peaks (separated by > 1 pixel)
+        pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
 
-    for i in range(len(pcent_pix)):
-        xx = pcent_pix-len(slice)/2
-        #wcent_pix = coeff[3] + xx * coeff[2] + coeff[1] * (xx*xx) + coeff[0] * (xx*xx*xx)
-        wcent_pix = np.polyval(coeff, xx)
+        # the number of pixels around the "peak" to fit over
+        pwidth = 10
+        # offset from start/end of array by at least same # of pixels
+        pk = pk[pk > pwidth]
+        pk = pk[pk < (len(slice)-pwidth)]
 
         if display is True:
             plt.figure()
             plt.plot(wtemp, slice, 'b')
-            plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
-            plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
-            plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
+            plt.plot(wtemp, np.ones_like(slice)*np.median(slice))
+            plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
 
-        # if there is a match w/i the linear tolerance
-        if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
-            # add corresponding pixel and *actual* wavelength to output vectors
-            pcent = np.append(pcent,pcent_pix[ss[i]])
-            wcent = np.append(wcent, linewave[np.argmin(np.abs(wcent_pix[ss[i]] - linewave))] )
+        pcent_pix = np.zeros_like(pk,dtype='float')
+        wcent_pix = np.zeros_like(pk,dtype='float') # wtemp[pk]
+        # for each peak, fit a gaussian to find center
+        for i in range(len(pk)):
+            xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
+            yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
+
+            pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
+            popt,pcov = curve_fit(gaus, np.arange(len(xi),dtype='float'), yi,
+                                  p0=pguess)
+
+            # the gaussian center of the line in pixel units
+            pcent_pix[i] = (pk[i]-pwidth) + popt[2]
+            # and the peak in wavelength units
+            wcent_pix[i] = xi[np.nanargmax(yi)]
 
             if display is True:
-                plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
-
-            if (len(pcent)>fit_order):
-                coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
+                plt.scatter(wtemp[pk][i], slice[pk][i], marker='o')
+                plt.plot(xi, gaus(np.arange(len(xi)),*popt), 'r')
+        if display is True:
+            plt.xlabel('approx. wavelength')
+            plt.ylabel('flux')
+            #plt.show()
 
         if display is True:
-            plt.xlim((min(wtemp),max(wtemp)))
+            plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='blue')
             plt.show()
 
-    # the end result is the vector "coeff" has the wavelength solution for "slice"
-    # update the "wtemp" vector that goes with "slice" (fluxes)
-    wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+    #   loop thru each peak, from center outwards. a greedy solution
+    #   find nearest list line. if not line within tolerance, then skip peak
+        pcent = []
+        wcent = []
+
+        # find center-most lines, sort by dist from center pixels
+        ss = np.argsort(np.abs(wcent_pix-wcen_approx))
+
+        #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
+        coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
+
+        for i in range(len(pcent_pix)):
+            xx = pcent_pix-len(slice)/2
+            #wcent_pix = coeff[3] + xx * coeff[2] + coeff[1] * (xx*xx) + coeff[0] * (xx*xx*xx)
+            wcent_pix = np.polyval(coeff, xx)
+
+            if display is True:
+                plt.figure()
+                plt.plot(wtemp, slice, 'b')
+                plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
+                plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
+                plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
+
+            # if there is a match w/i the linear tolerance
+            if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
+                # add corresponding pixel and *actual* wavelength to output vectors
+                pcent = np.append(pcent,pcent_pix[ss[i]])
+                wcent = np.append(wcent, linewave[np.argmin(np.abs(wcent_pix[ss[i]] - linewave))] )
+
+                if display is True:
+                    plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
+
+                if (len(pcent)>fit_order):
+                    coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
+
+            if display is True:
+                plt.xlim((min(wtemp),max(wtemp)))
+                plt.show()
+
+        # the end result is the vector "coeff" has the wavelength solution for "slice"
+        # update the "wtemp" vector that goes with "slice" (fluxes)
+        wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+    elif interac is True:
+        print('need to add this function')
+        plt.figure()
+        plt.plot(wtemp, slice, 'b')
 
     #-- trace the peaks vertically
     # how far can the trace be bent, i.e. how big a window to fit over?

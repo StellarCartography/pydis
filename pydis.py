@@ -136,8 +136,8 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
     skysubflux = np.zeros_like(trace)
     for i in range(0,len(trace)):
         itrace = int(trace[i])
-        y = np.append(np.arange(itrace-skysep-skywidth, itrace-skysep),
-                      np.arange(itrace+skysep, itrace+skysep+skywidth))
+        y = np.append(np.arange(itrace-apwidth-skysep-skywidth, itrace-apwidth-skysep),
+                      np.arange(itrace+apwidth+skysep, itrace+apwidth+skysep+skywidth))
 
         z = img[y,i]
         # fit a polynomial to the sky in this column
@@ -154,6 +154,7 @@ def HeNeAr_fit(calimage, linelist='',
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
 
+    print('Running HeNeAr_fit...')
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -481,12 +482,12 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
 
 
-        if display is True:
-            plt.figure()
-            plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
-            plt.plot(np.arange(len(trace)),trace,'r')
-            plt.title(spec+' (with trace)')
-            plt.show()
+        # if display is True:
+        #     plt.figure()
+        #     plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
+        #     plt.plot(np.arange(len(trace)),trace,'r')
+        #     plt.title(spec+' (with trace)')
+        #     plt.show()
 
         # extract the spectrum
         ext_spec = ap_extract(data, trace, apwidth=apwidth)
@@ -497,12 +498,17 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         xbins = np.arange(data.shape[1])
         if display is True:
             plt.figure()
-            plt.imshow(np.log10(data), origin = 'lower',aspect='auto')
+            plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
             plt.colorbar()
-            plt.plot(xbins, trace,'k',lw=1)
-            plt.plot(xbins, trace-3.,'r',lw=1)
-            plt.plot(xbins, trace+3.,'r',lw=1)
-            plt.title('(with trace and aperture region)')
+            plt.plot(xbins, trace,'b',lw=1)
+            plt.plot(xbins, trace-apwidth,'r',lw=1)
+            plt.plot(xbins, trace+apwidth,'r',lw=1)
+            plt.plot(xbins, trace-apwidth-skysep,'g',lw=1)
+            plt.plot(xbins, trace-apwidth-skysep-skywidth,'g',lw=1)
+            plt.plot(xbins, trace+apwidth+skysep,'g',lw=1)
+            plt.plot(xbins, trace+apwidth+skysep+skywidth,'g',lw=1)
+
+            plt.title('(with trace, aperture, and sky regions)')
             plt.show()
 
         # write output file for extracted spectrum

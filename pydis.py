@@ -173,7 +173,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist='',
+def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
 
@@ -190,7 +190,7 @@ def HeNeAr_fit(calimage, linelist='',
     disp_approx = hdu[0].header['DISPDW']
     wcen_approx = hdu[0].header['DISPWC']
 
-    # the red chip wavelength is backwards
+    # the red chip wavelength is backwards (DIS specific)
     clr = hdu[0].header['DETECTOR']
     if (clr.lower()=='red'):
         sign = -1.0
@@ -205,10 +205,8 @@ def HeNeAr_fit(calimage, linelist='',
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
-    # sort data, cut top 5% of flux data as peak threshold
-    tmp = slice.copy()
-    tmp.sort()
-    flux_thresh = tmp[int(len(tmp)*0.97)]
+    # sort data, cut top x% of flux data as peak threshold
+    flux_thresh = np.percentile(slice, 97)
 
     # find flux above threshold
     high = np.where( (slice >= flux_thresh) )
@@ -589,20 +587,3 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     return
 
-
-
-#########################
-#  Test Data / Examples
-#########################
-
-# autoreduce('robj.lis','rflat.lis', 'rbias.lis','example_data/HeNeAr.0027r.fits',
-#            trim=True, display=False)
-
-# autoreduce('bobj.lis','bflat.lis', 'bbias.lis','example_data/HeNeAr.0028b.fits',
-#            trim=True, display=False)
-
-#
-# pydis.autoreduce('objlist','flatlist', 'biaslist',
-#                  '05may31.0035r.fits',
-#                  apwidth=6,skysep=50,skywidth=50,
-#                  trim=True, display=False)

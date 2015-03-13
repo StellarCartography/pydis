@@ -51,10 +51,32 @@ from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
 import scipy.signal
 import os
+#import itertools
 
-#########################
+#0000000000000000000000000000
 def gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
+
+## useful functions for 2D polyfit, if want to do it later.
+## http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
+# def polyfit2d(x, y, z, order=3):
+#     ncols = (order + 1)**2
+#     G = np.zeros((x.size, ncols))
+#     ij = itertools.product(range(order+1), range(order+1))
+#     for k, (i,j) in enumerate(ij):
+#         G[:,k] = x**i * y**j
+#     m, _, _, _ = np.linalg.lstsq(G, z)
+#     return m
+#
+# def polyval2d(x, y, m):
+#     order = int(np.sqrt(len(m))) - 1
+#     ij = itertools.product(range(order+1), range(order+1))
+#     z = np.zeros_like(x)
+#     for a, (i,j) in zip(m, ij):
+#         z += a * x**i * y**j
+#     return z
+#0000000000000000000000000000
+
 
 #########################
 def ap_trace(img, fmask=(1,), nsteps=50):
@@ -350,13 +372,17 @@ def HeNeAr_fit(calimage, linelist='',
     print('Fitting Spline!')
     wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
                                  bbox=[0,img.shape[1],0,img.shape[0]] )
-
+    ## using 2d polyfit
+    # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
     return wfit
 
 ##########################
 def mapwavelength(trace, wavemap):
     # use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
     trace_wave = wavemap.ev(np.arange(len(trace)), trace)
+
+    ## using 2d polyfit
+    # trace_wave = polyval2d(np.arange(len(trace)), trace, wavemap)
     return trace_wave
 
 

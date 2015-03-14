@@ -54,6 +54,8 @@ from scipy.interpolate import SmoothBivariateSpline
 import scipy.signal
 import datetime
 import os
+import sys
+from matplotlib.widgets import Cursor
 #import itertools
 
 #0000000000000000000000000000
@@ -79,6 +81,17 @@ def gaus(x,a,b,x0,sigma):
 #         z += a * x**i * y**j
 #     return z
 #0000000000000000000000000000
+
+#
+# def OnClick(event):
+#     if event.dblclick:
+#         print("DBLCLICK", event)
+#     else:
+#         print("DOWN    ", event)
+#
+#
+# def OnRelease(event):
+#     print("UP      ", event)
 
 
 #########################
@@ -309,10 +322,41 @@ def HeNeAr_fit(calimage, linelist='', interac=False,
         # the end result is the vector "coeff" has the wavelength solution for "slice"
         # update the "wtemp" vector that goes with "slice" (fluxes)
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+
     elif interac is True:
-        print('need to add this function')
-        plt.figure()
-        plt.plot(wtemp, slice, 'b')
+
+        # fig = plt.figure()
+        # plt.plot(wtemp, slice, 'b')
+        # ax = fig.add_subplot(111)#, axisbg='#FFFFCC')
+        # ax.plot(wtemp, slice, 'b')
+        #
+        # # set useblit = True on gtkagg for enhanced performance
+        # cid_up = fig.canvas.mpl_connect('button_press_event', OnClick)
+        # cid_down = fig.canvas.mpl_connect('button_release_event', OnRelease)
+        # cursor = Cursor(ax, useblit=False,horizOn=False, color='red', linewidth=1 )
+        #
+        # plt.show()
+
+
+        def OnClick(event):
+            if event.dblclick:
+                print("DBLCLICK", event)
+            else:
+                print("DOWN    ", event)
+
+
+        def OnRelease(event):
+            print("UP      ", event)
+
+
+        fig = plt.figure()
+        cid_up = fig.canvas.mpl_connect('button_press_event', OnClick)
+        cid_down = fig.canvas.mpl_connect('button_release_event', OnRelease)
+
+        plt.gca().text(0.5, 0.5, "Click on the canvas to test mouse events.", ha="center", va="center")
+        plt.plot([1],[1])
+        plt.show()
+
 
     #-- trace the peaks vertically
     # how far can the trace be bent, i.e. how big a window to fit over?

@@ -43,7 +43,7 @@ Things I'm not going to worry about:
 """
 
 import matplotlib
-matplotlib.use('QT4Agg')
+matplotlib.use('TkAgg')
 from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
@@ -316,32 +316,61 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
     elif interac is True:
+        xraw = np.arange(len(slice))
         class InteracWave:
+            # http://stackoverflow.com/questions/21688420/callbacks-for-graphical-mouse-input-how-to-refresh-graphics-how-to-tell-matpl
             def __init__(self):
-                fig = plt.figure()
-                ax = fig.add_subplot(111)
-                ax.plot(wtemp, slice, 'b')
+                self.fig = plt.figure()
+                self.ax = self.fig.add_subplot(111)
+                self.ax.plot(wtemp, slice, 'b')
 
-                cursor = Cursor(ax, useblit=False,horizOn=False, color='red', linewidth=1 )
-                cid_up = fig.canvas.mpl_connect('button_press_event', self.OnClick)
-                plt.show()
+                self.pcent = []
+                self.wcent = []
 
-                
+                self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
+                                     color='red', linewidth=1 )
+                self.connect = self.fig.canvas.mpl_connect
+                self.disconnect = self.fig.canvas.mpl_disconnect
+                self.clickCid = self.connect("button_press_event",self.OnClick)
+
             def OnClick(self, event):
-                global ix, iy
-                ix, iy = event.xdata, event.ydata
-                global coords
-                coords.append((ix))
-                print(coords)
+                # only do stuff if toolbar not being used
+                # NOTE: this subject to change API, so if breaks, this probably why
+                # http://stackoverflow.com/questions/20711148/ignore-matplotlib-cursor-widget-when-toolbar-widget-selected
+                if self.fig.canvas.manager.toolbar._active is None:
+                    ix = event.xdata
+                    nearby = np.where((wtemp > ix-10*disp_approx) &
+                                      (wtemp < ix+10*disp_approx) )
+                    imax = np.nanargmax(slice[nearby])
+                    # print(imax, wtemp[nearby][imax])
 
+                    pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
+                    popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
+                    self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
 
-            global coords
-            coords = []
+                    # this works, but requires changing focus, need to use a tk gui instead
+                    # follow this example next: http://matplotlib.org/examples/user_interfaces/embedding_in_tk.html
+                    try:
+                        number=float(raw_input('Enter Wavelength: '))
+                    except ValueError:
+                        print "Not a number"
 
-
+                    self.pcent.append(popt[2])
+                    self.wcent.append(number)
+                else:
+                    pass
 
         test = InteracWave()
+        plt.show()
 
+        pcent = np.array(test.pcent,dtype='float')
+        wcent = np.array(test.wcent, dtype='float')
+        print(pcent)
+        print(wcent)
+
+        # fit polynomial thru the peak wavelengths
+        coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
+        wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
     #-- trace the peaks vertically
     # how far can the trace be bent, i.e. how big a window to fit over?

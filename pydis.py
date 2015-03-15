@@ -58,6 +58,8 @@ import sys
 from matplotlib.widgets import Cursor
 #import itertools
 
+
+
 #0000000000000000000000000000
 def gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
@@ -82,16 +84,6 @@ def gaus(x,a,b,x0,sigma):
 #     return z
 #0000000000000000000000000000
 
-#
-# def OnClick(event):
-#     if event.dblclick:
-#         print("DBLCLICK", event)
-#     else:
-#         print("DOWN    ", event)
-#
-#
-# def OnRelease(event):
-#     print("UP      ", event)
 
 
 #########################
@@ -188,7 +180,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 ##########################
-def HeNeAr_fit(calimage, linelist='', interac=False,
+def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
 
@@ -324,38 +316,31 @@ def HeNeAr_fit(calimage, linelist='', interac=False,
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
     elif interac is True:
+        class InteracWave:
+            def __init__(self):
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                ax.plot(wtemp, slice, 'b')
 
-        # fig = plt.figure()
-        # plt.plot(wtemp, slice, 'b')
-        # ax = fig.add_subplot(111)#, axisbg='#FFFFCC')
-        # ax.plot(wtemp, slice, 'b')
-        #
-        # # set useblit = True on gtkagg for enhanced performance
-        # cid_up = fig.canvas.mpl_connect('button_press_event', OnClick)
-        # cid_down = fig.canvas.mpl_connect('button_release_event', OnRelease)
-        # cursor = Cursor(ax, useblit=False,horizOn=False, color='red', linewidth=1 )
-        #
-        # plt.show()
+                cursor = Cursor(ax, useblit=False,horizOn=False, color='red', linewidth=1 )
+                cid_up = fig.canvas.mpl_connect('button_press_event', self.OnClick)
+                plt.show()
 
-
-        def OnClick(event):
-            if event.dblclick:
-                print("DBLCLICK", event)
-            else:
-                print("DOWN    ", event)
+                
+            def OnClick(self, event):
+                global ix, iy
+                ix, iy = event.xdata, event.ydata
+                global coords
+                coords.append((ix))
+                print(coords)
 
 
-        def OnRelease(event):
-            print("UP      ", event)
+            global coords
+            coords = []
 
 
-        fig = plt.figure()
-        cid_up = fig.canvas.mpl_connect('button_press_event', OnClick)
-        cid_down = fig.canvas.mpl_connect('button_release_event', OnRelease)
 
-        plt.gca().text(0.5, 0.5, "Click on the canvas to test mouse events.", ha="center", va="center")
-        plt.plot([1],[1])
-        plt.show()
+        test = InteracWave()
 
 
     #-- trace the peaks vertically

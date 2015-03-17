@@ -6,6 +6,7 @@ A simple reduction package for one dimensional longslit spectroscopy using Pytho
 
 The goal is to make pyDIS as easy to use while observing as possible. Here is an example of a script you might run over and over throughout the night:
 
+````python
     # if pyDIS isn't in the currnet working directory, add to path
     import sys
     sys.path.append('/Users/james/python/pyDIS/')
@@ -15,6 +16,7 @@ The goal is to make pyDIS as easy to use while observing as possible. Here is an
     
     pydis.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
                      'HeNeAr.0005r.fits', HeNeAr_interac=False)
+````
 
 The `autoreduce` function must be given a list of target objects, a list of flats frames, a list of bias frames, and the path to one HeNeAr calibration frame. In this example, the HeNeAr frame is automatically fit, which usually works reasonably well but should not be trusted for e.g. sub-pixel velocity calibration.
 

@@ -40,10 +40,7 @@ from scipy.interpolate import SmoothBivariateSpline
 import scipy.signal
 import datetime
 import os
-import sys
 from matplotlib.widgets import Cursor
-#import itertools
-
 
 
 #0000000000000000000000000000
@@ -554,16 +551,19 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                trace1=False, ntracesteps=25,
-               apwidth=3,skysep=25,skywidth=75,
+               apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
+    # use trace1=True if only perform aperture trace on first object in
+    # speclist. Useful if e.g. science targets are faint, and first object
+    # is a bright standard star
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)
     flat,fmask_out = flatcombine(flatlist, bias, trim=True)
 
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out,
+    wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out,interac=HeNeAr_interac,
                       display=displayHeNeAr,tol=HeNeAr_tol,fit_order=HeNeAr_order)
 
     # read in the list of target spectra
@@ -594,13 +594,6 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         if (i==0) or (trace1 is False):
             trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
 
-
-        # if display is True:
-        #     plt.figure()
-        #     plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
-        #     plt.plot(np.arange(len(trace)),trace,'r')
-        #     plt.title(spec+' (with trace)')
-        #     plt.show()
 
         # extract the spectrum
         ext_spec = ap_extract(data, trace, apwidth=apwidth)

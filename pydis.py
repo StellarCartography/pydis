@@ -2,43 +2,29 @@
 """
 Created on Mon Mar  2 17:40:42 2015
 
-@author: jradavenport, much help by jruan
+@author: jradavenport, with help by jruan
 
 Try to make a simple one dimensional spectra reduction package
-
-Some ideas from Python4Astronomers tutorial:
-    https://python4astronomers.github.io/core/numpy_scipy.html
 
 Plus some simple reduction (flat and bias) methods
 
 Created with the Apache Point Observatory (APO) 3.5-m telescope's
 Dual Imaging Spectrograph (DIS) in mind. YMMV
 
-e.g. 
+e.g. DIS specifics:
 - have BLUE/RED channels
 - hand-code in that the RED channel wavelength is backwards
-- dispersion along the X, spatial along the Y
+- dispersion along the X, spatial along the Y axis
 
 +++
-Steps to crappy reduction to 1dspec:
+Steps to simple reduction from image to 1dspec:
 
 1. flat and bias correct (easy)
 2. identify lines in wavelength cal image (HeNeAr) and define the
     wavelength solution in 2D space
 3. trace the object spectrum, define aperture and sky regions
 4. extract object, subtract sky, interpolate wavelength space
-
-
----
-Things I'm not going to worry about:
-
-- interactive everything (yet)
-- cosmic rays
-- bad pixels
-- overscan
-- multiple objects on slit
-- extended objects on slit
-- flux calibration (yet)
+5. flux calibrate (not yet)
 
 """
 

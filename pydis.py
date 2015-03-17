@@ -349,36 +349,43 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 # http://stackoverflow.com/questions/20711148/ignore-matplotlib-cursor-widget-when-toolbar-widget-selected
                 if self.fig.canvas.manager.toolbar._active is None:
                     ix = event.xdata
-                    if (ix is not None):
+                    if (ix is not None) and (ix > np.nanmin(slice)) and (ix < np.nanmax(slice)):
                         # disable button event connection
                         self.disconnect(self.clickCid)
-                        nearby = np.where((wtemp > ix-10*disp_approx) &
-                                          (wtemp < ix+10*disp_approx) )
-                        imax = np.nanargmax(slice[nearby])
-                        # print(imax, wtemp[nearby][imax])
-
-                        pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
-                        try:
-                            popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
-                            self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
-                        except ValueError:
-                            print(' Bad data near this click, cannot centroid line with Gaussian. I suggest you skip this one')
-                            popt = pguess
-                        except RuntimeError:
-                            print(' Gaussian centroid on line could not converge. I suggest you skip this one')
-                            popt = pguess
 
                         # disconnect cursor, and remove from plot
                         self.cursor.disconnect_events()
                         self.cursor._update()
 
-                        # using raw_input sucks b/c doesn't raise terminal, but works for now
-                        try:
-                            number=float(raw_input('> Enter Wavelength: '))
-                            self.pcent.append(popt[2])
-                            self.wcent.append(number)
-                        except ValueError:
-                            print "> Warning: Not a valid wavelength float!"
+                        nearby = np.where((wtemp > ix-10*disp_approx) &
+                                          (wtemp < ix+10*disp_approx) )
+
+                        if (len(nearby[0]) > 4):
+                            imax = np.nanargmax(slice[nearby])
+
+                            pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
+                            try:
+                                popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
+                                self.ax.plot(wtemp[int(popt[2])], popt[0], 'r|')
+                            except ValueError:
+                                print('> WARNING: Bad data near this click, cannot centroid line with Gaussian. I suggest you skip this one')
+                                popt = pguess
+                            except RuntimeError:
+                                print('> WARNING: Gaussian centroid on line could not converge. I suggest you skip this one')
+                                popt = pguess
+
+                            # using raw_input sucks b/c doesn't raise terminal, but works for now
+                            try:
+                                number=float(raw_input('> Enter Wavelength: '))
+                                self.pcent.append(popt[2])
+                                self.wcent.append(number)
+                                self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
+                                print('  Saving '+str(number))
+                            except ValueError:
+                                print "> Warning: Not a valid wavelength float!"
+
+                        else:
+                            print('> Error: No valid data near click!')
 
                         # reconnect to cursor and button event
                         self.clickCid = self.connect("button_press_event",self.OnClick)

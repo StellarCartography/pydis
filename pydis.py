@@ -348,8 +348,10 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                     popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
                     self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
 
-                    # this works, but requires changing focus, need to use a tk gui instead
-                    # follow this example next: http://matplotlib.org/examples/user_interfaces/embedding_in_tk.html
+                    #- I am a not a smart man, and a bad event driven programmer...
+                    #- this works, but requires changing focus, and doesnt block the mouse
+                    #- need to use a tk gui instead?
+                    #- http://matplotlib.org/examples/user_interfaces/embedding_in_tk.html
                     try:
                         number=float(raw_input('Enter Wavelength: '))
                     except ValueError:

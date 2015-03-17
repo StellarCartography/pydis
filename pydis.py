@@ -184,7 +184,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
 
-    print('Running HeNeAr_fit...')
+    print('Running HeNeAr_fit function.')
 
     hdu = fits.open(calimage)
     if trim is False:
@@ -316,6 +316,14 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
     elif interac is True:
+
+        print('')
+        print('Using INTERACTIVE HeNeAr_fit mode:')
+        print('1) Click on HeNeAr lines in plot window')
+        print('2) Enter corresponding wavelength in terminal and press <return>')
+        print('   If mis-click or unsure, just press leave blank and press <return>')
+        print('3) Close plot window when finished')
+
         xraw = np.arange(len(slice))
         class InteracWave:
             # http://stackoverflow.com/questions/21688420/callbacks-for-graphical-mouse-input-how-to-refresh-graphics-how-to-tell-matpl
@@ -323,6 +331,8 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 self.fig = plt.figure()
                 self.ax = self.fig.add_subplot(111)
                 self.ax.plot(wtemp, slice, 'b')
+                plt.xlabel('Wavelength')
+                plt.ylabel('Counts')
 
                 self.pcent = []
                 self.wcent = []
@@ -339,26 +349,41 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 # http://stackoverflow.com/questions/20711148/ignore-matplotlib-cursor-widget-when-toolbar-widget-selected
                 if self.fig.canvas.manager.toolbar._active is None:
                     ix = event.xdata
-                    nearby = np.where((wtemp > ix-10*disp_approx) &
-                                      (wtemp < ix+10*disp_approx) )
-                    imax = np.nanargmax(slice[nearby])
-                    # print(imax, wtemp[nearby][imax])
+                    if (ix is not None):
+                        # disable button event connection
+                        self.disconnect(self.clickCid)
+                        nearby = np.where((wtemp > ix-10*disp_approx) &
+                                          (wtemp < ix+10*disp_approx) )
+                        imax = np.nanargmax(slice[nearby])
+                        # print(imax, wtemp[nearby][imax])
 
-                    pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
-                    popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
-                    self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
+                        pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
+                        try:
+                            popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
+                            self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
+                        except ValueError:
+                            print(' Bad data near this click, cannot centroid line with Gaussian. I suggest you skip this one')
+                            popt = pguess
+                        except RuntimeError:
+                            print(' Gaussian centroid on line could not converge. I suggest you skip this one')
+                            popt = pguess
 
-                    #- I am a not a smart man, and a bad event driven programmer...
-                    #- this works, but requires changing focus, and doesnt block the mouse
-                    #- need to use a tk gui instead?
-                    #- http://matplotlib.org/examples/user_interfaces/embedding_in_tk.html
-                    try:
-                        number=float(raw_input('Enter Wavelength: '))
-                    except ValueError:
-                        print "Not a number"
+                        # disconnect cursor, and remove from plot
+                        self.cursor.disconnect_events()
+                        self.cursor._update()
 
-                    self.pcent.append(popt[2])
-                    self.wcent.append(number)
+                        # using raw_input sucks b/c doesn't raise terminal, but works for now
+                        try:
+                            number=float(raw_input('> Enter Wavelength: '))
+                            self.pcent.append(popt[2])
+                            self.wcent.append(number)
+                        except ValueError:
+                            print "> Warning: Not a valid wavelength float!"
+
+                        # reconnect to cursor and button event
+                        self.clickCid = self.connect("button_press_event",self.OnClick)
+                        self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
+                                         color='red', linewidth=1 )
                 else:
                     pass
 

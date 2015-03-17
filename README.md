@@ -6,28 +6,30 @@ A simple reduction package for one dimensional longslit spectroscopy using Pytho
 
 The goal is to make pyDIS as easy to use while observing as possible. Here is an example of a script you might run over and over throughout the night:
 
-````python
-    # if pyDIS isn't in the currnet working directory, add to path
-    import sys
-    sys.path.append('/Users/james/python/pyDIS/')
+````python 
+# if pyDIS isn't in the currnet working directory, add to path
+import sys
+sys.path.append('/Users/james/python/pyDIS/')
+
+# must import, of course
+import pydis
     
-    # must import, of course
-    import pydis
-    
-    pydis.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
-                     'HeNeAr.0005r.fits', HeNeAr_interac=False)
+pydis.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
+                 'HeNeAr.0005r.fits', HeNeAr_interac=False)
 ````
 
 The `autoreduce` function must be given a list of target objects, a list of flats frames, a list of bias frames, and the path to one HeNeAr calibration frame. In this example, the HeNeAr frame is automatically fit, which usually works reasonably well but should not be trusted for e.g. sub-pixel velocity calibration.
 
 Many keywords are available to customize the `autoreduce` function. Here are the default definitions:
 
-    autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-               trace1=False, ntracesteps=25,
-               apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
-               HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
-               trim=True, write_reduced=True, display=True)
 
+````python
+autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
+           trace1=False, ntracesteps=25,
+           apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
+           HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
+           trim=True, write_reduced=True, display=True)
+````
 
 Master flat and bias files (FLAT.fits and BIAS.fits by default), trace files with x,y coordinates (.trace files), and two column wavelength,flux spectra (.spec files), will be written at the end.
 
@@ -35,8 +37,10 @@ Master flat and bias files (FLAT.fits and BIAS.fits by default), trace files wit
 ### Manually reduce stuff
 You can also use each component of the reduction process. For example, if you wanted to combine all your flat and bias frames:
 
-    bias = pydis.biascombine('biaslist.txt')
-    flat, mask = pydis.flatcombine('flatlist.txt', bias)
+````python 
+bias = pydis.biascombine('biaslist.txt')
+flat, mask = pydis.flatcombine('flatlist.txt', bias)
+````
 
 The resulting flat and bias frames are returned as numpy arrays. By default these functions will write files called **BIAS.fits** and **FLAT.fits**, unless a different name is specified using the `output = 'file.fits'` keyword.
 Note also that `flatcombine` returns both the data array and a 1-d "mask" array, which determines from the flat the portion of the CCD that is illuminated.

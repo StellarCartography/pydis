@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
+A simple one dimensional spectra reduction and analysis package
+
 Created on Mon Mar  2 17:40:42 2015
 
 @author: jradavenport, with help by jruan
-
-Try to make a simple one dimensional spectra reduction package
-
-Plus some simple reduction (flat and bias) methods
 
 Created with the Apache Point Observatory (APO) 3.5-m telescope's
 Dual Imaging Spectrograph (DIS) in mind. YMMV
@@ -47,30 +45,21 @@ from matplotlib.widgets import Cursor
 def gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
-## useful functions for 2D polyfit, if want to do it later.
-## http://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
-# def polyfit2d(x, y, z, order=3):
-#     ncols = (order + 1)**2
-#     G = np.zeros((x.size, ncols))
-#     ij = itertools.product(range(order+1), range(order+1))
-#     for k, (i,j) in enumerate(ij):
-#         G[:,k] = x**i * y**j
-#     m, _, _, _ = np.linalg.lstsq(G, z)
-#     return m
-#
-# def polyval2d(x, y, m):
-#     order = int(np.sqrt(len(m))) - 1
-#     ij = itertools.product(range(order+1), range(order+1))
-#     z = np.zeros_like(x)
-#     for a, (i,j) in zip(m, ij):
-#         z += a * x**i * y**j
-#     return z
-#0000000000000000000000000000
-
 
 
 #########################
 def ap_trace(img, fmask=(1,), nsteps=50):
+    """Trace the spectrum aperture in an image
+
+    Assumes wavelength axis is along the X, spatial axis along the Y.
+    Chops image up in bix along the wavelength direction, fits a Gaussian
+    within each bin to determine the spatial center of the trace. Finally,
+    draws a cubic spline through the bins to up-sample the trace.
+
+    Keyword arguments:
+    nsteps -- Number of bins in X direction to chop image into (default 50)
+    fmask -- A list of illuminated rows in the spatial direction (Y), as returned by flatcombine. (optional)
+    """
     print('Tracing Aperture using nsteps='+str(nsteps))
     # the valid y-range of the chip
     if (len(fmask)>1):
@@ -125,6 +114,9 @@ def ap_trace(img, fmask=(1,), nsteps=50):
 
 #########################
 def ap_extract(img, trace, apwidth=5.0):
+    """Extract the spectrum using the trace
+    
+    """
     # simply add up the total flux around the trace +/- width
     onedspec = np.zeros_like(trace)
     for i in range(0,len(trace)):

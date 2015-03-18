@@ -9,7 +9,7 @@ The goal is to make pyDIS as easy to use while observing as possible. Here is an
 ````python 
 # if pyDIS isn't in the currnet working directory, add to path
 import sys
-sys.path.append('/Users/james/python/pyDIS/')
+sys.path.append('/path/to/stuff/pyDIS/')
 
 # must import, of course
 import pydis

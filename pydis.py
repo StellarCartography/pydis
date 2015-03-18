@@ -42,9 +42,9 @@ from matplotlib.widgets import Cursor
 
 
 #0000000000000000000000000000
-def gaus(x,a,b,x0,sigma):
+def _gaus(x,a,b,x0,sigma):
+    """ Simple Gaussian function, for internal use only """
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
-
 
 
 #########################
@@ -59,10 +59,15 @@ def ap_trace(img, fmask=(1,), nsteps=50):
 
     Parameters
     ----------
+    img : 2d numpy array
+        This is the image, stored as a normal numpy array. Can be read in
+        using astropy.io.fits like so:
+        >>> hdu = fits.open('file.fits')
+        >>> img = hdu[0].data
     nsteps : int, optional
-        Number of bins in X direction to chop image into. Use fewer bins
-        if ap_trace is having difficulty, such as for faint targets
-        (default is 50, minimum is 4)
+        Keyword, number of bins in X direction to chop image into. Use
+        fewer bins if ap_trace is having difficulty, such as with faint
+        targets (default is 50, minimum is 4)
     fmask : array-like, optional
         A list of illuminated rows in the spatial direction (Y), as
         returned by flatcombine.
@@ -91,7 +96,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     ztot = img_sm.sum(axis=1)[ydata]
     yi = np.arange(img.shape[0])[ydata]
     peak_y = yi[np.nanargmax(ztot)]
-    popt_tot,pcov = curve_fit(gaus, yi, ztot,
+    popt_tot,pcov = curve_fit(_gaus, yi, ztot,
                           p0=[np.nanmax(ztot), np.median(ztot), peak_y, 2.])
 
     # define the bin edges
@@ -105,7 +110,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
         #-- fit gaussian w/i each window
         zi = img_sm[ydata, xbins[i]:xbins[i+1]].sum(axis=1)
         pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
-        popt,pcov = curve_fit(gaus, yi, zi, p0=pguess)
+        popt,pcov = curve_fit(_gaus, yi, zi, p0=pguess)
 
         # if gaussian fits off chip, then use chip-integrated answer
         if (popt[2] <= min(ydata)+25) or (popt[2] >= max(ydata)-25):
@@ -125,12 +130,37 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     my = ap_spl(mx)
     return my
 
+
 #########################
 def ap_extract(img, trace, apwidth=5.0):
-    """Extract the spectrum using the trace
-
     """
-    # simply add up the total flux around the trace +/- width
+    Extract the spectrum using the trace. Simply add up all the flux
+    around the aperture within a specified +/- width.
+
+    Note: implicitly assumes wavelength axis is perfectly vertical within
+    the trace. An important simplification.
+
+    Parameters
+    ----------
+    img : 2d numpy array
+        This is the image, stored as a normal numpy array. Can be read in
+        using astropy.io.fits like so:
+        >>> hdu = fits.open('file.fits')
+        >>> img = hdu[0].data
+    trace : 1-d array
+        The spatial positions (Y axis) corresponding to the center of the
+        trace for every wavelength (X axis), as returned from ap_trace
+    apwidth : int, optional
+        The width along the Y axis of the trace to extract. Note: a fixed
+        width is used along the whole trace. (default is 5 pixels)
+
+    Returns
+    -------
+    onedspec : array
+        The summed flux at each column about the trace. Note: is not
+        sky subtracted!
+    """
+
     onedspec = np.zeros_like(trace)
     for i in range(0,len(trace)):
         # juuuust in case the trace gets too close to the edge
@@ -142,15 +172,43 @@ def ap_extract(img, trace, apwidth=5.0):
         if (trace[i]-widthdn < 0):
             widthdn = trace[i] - 1
 
+        # simply add up the total flux around the trace +/- width
         onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup, i].sum()
     return onedspec
 
 
 #########################
 def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
-    # do simple parabola fit at each pixel
-    # (assume wavelength axis is perfectly vertical)
-    # return 1-d sky values along trace
+    """
+    Fits a polynomial to the sky at each column
+
+    Note: implicitly assumes wavelength axis is perfectly vertical within
+    the trace. An important simplification.
+
+    Parameters
+    ----------
+    img : 2d numpy array
+        This is the image, stored as a normal numpy array. Can be read in
+        using astropy.io.fits like so:
+        >>> hdu = fits.open('file.fits')
+        >>> img = hdu[0].data
+    trace : 1-d array
+        The spatial positions (Y axis) corresponding to the center of the
+        trace for every wavelength (X axis), as returned from ap_trace
+    apwidth : int, optional
+        The width along the Y axis of the trace to extract. Note: a fixed
+        width is used along the whole trace. (default is 5 pixels)
+    skysep : int, optional
+    skywidth : int, optional
+    skydeg : int, optional
+
+    Returns
+    -------
+    skysubflux : 1d array
+        The integrated sky values along each column, suitable for
+        subtracting from the output of ap_extract
+    """
+
     skysubflux = np.zeros_like(trace)
     for i in range(0,len(trace)):
         itrace = int(trace[i])
@@ -171,6 +229,46 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
+    """
+    Determine the wavelength solution to be used for the science images.
+    Can be done either automatically (buyer beware) or manually. Both the
+    manual and auto modes use a "slice" through the chip center to learn
+    the wavelengths of specific HeNeAr lines. Emulates the IDENTIFY
+    function in IRAF.
+
+    If the automatic mode is selected (interac=False), program tries to
+    first find significant peaks in the "slice", then uses a brute-force
+    guess scheme based on the grating information in the header. While
+    easy, your mileage may vary with this method.
+
+    If the interactive mode is selected (interac=True), you click on
+    features in the "slice" and identify their wavelengths.
+
+    Parameters
+    ----------
+    calimage : string
+        Path to the HeNeAr calibration image
+    linelist : string, optional
+        Path to the linelist file to use. Only needed if using the
+        automatic mode.
+    interac : bool, optional
+        Should the HeNeAr identification be done interactively (manually)?
+        (Default is True)
+    trim : bool, optional
+        (Default is True)
+    fmask : array-like, optional
+        A list of illuminated rows in the spatial direction (Y), as
+        returned by flatcombine.
+    display : bool, optional
+    tol : int, optional
+        (Default is 10)
+    fit_order : int, optional
+        (Default is 2)
+
+    Returns
+    -------
+    wfit :
+    """
 
     print('Running HeNeAr_fit function.')
 
@@ -200,17 +298,16 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
-    # find the linelist of choice
-    if (len(linelist)==0):
-        dir = os.path.dirname(os.path.realpath(__file__))
-        linelist = dir + '/resources/dishigh_linelist.txt'
-
-    # import the linelist
-    linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
-
-
     ######   IDENTIFY   (auto and interac modes)
     if interac is False:
+        # find the linelist of choice
+        if (len(linelist)==0):
+            dir = os.path.dirname(os.path.realpath(__file__))
+            linelist = dir + '/resources/dishigh_linelist.txt'
+
+        # import the linelist
+        linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
+
         # sort data, cut top x% of flux data as peak threshold
         flux_thresh = np.percentile(slice, 97)
 
@@ -240,7 +337,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
             yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
 
             pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-            popt,pcov = curve_fit(gaus, np.arange(len(xi),dtype='float'), yi,
+            popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
                                   p0=pguess)
 
             # the gaussian center of the line in pixel units
@@ -250,7 +347,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 
             if display is True:
                 plt.scatter(wtemp[pk][i], slice[pk][i], marker='o')
-                plt.plot(xi, gaus(np.arange(len(xi)),*popt), 'r')
+                plt.plot(xi, _gaus(np.arange(len(xi)),*popt), 'r')
         if display is True:
             plt.xlabel('approx. wavelength')
             plt.ylabel('flux')
@@ -353,7 +450,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 
                             pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
                             try:
-                                popt,pcov = curve_fit(gaus, xraw[nearby], slice[nearby], p0=pguess)
+                                popt,pcov = curve_fit(_gaus, xraw[nearby], slice[nearby], p0=pguess)
                                 self.ax.plot(wtemp[int(popt[2])], popt[0], 'r|')
                             except ValueError:
                                 print('> WARNING: Bad data near this click, cannot centroid line with Gaussian. I suggest you skip this one')
@@ -427,7 +524,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
             pguess = [np.nanmax(yline),img_med,cguess,2.]
-            popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
+            popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
             cguess = popt[2] # update center pixel
 
             xcent_big = np.append(xcent_big, popt[2])
@@ -441,7 +538,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
             pguess = [np.nanmax(yline),img_med,cguess,2.]
-            popt,pcov = curve_fit(gaus, xline, yline, p0=pguess)
+            popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
             cguess = popt[2] # update center pixel
 
             xcent_big = np.append(xcent_big, popt[2])
@@ -467,6 +564,12 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 
 ##########################
 def mapwavelength(trace, wavemap):
+    """
+
+    trace:
+    wavemap:
+    :return:
+    """
     # use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
     trace_wave = wavemap.ev(np.arange(len(trace)), trace)
 
@@ -477,6 +580,13 @@ def mapwavelength(trace, wavemap):
 
 #########################
 def biascombine(biaslist, output='BIAS.fits', trim=True):
+    """
+
+    biaslist:
+    output:
+    trim:
+    :return:
+    """
     # assume biaslist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
     files = np.loadtxt(biaslist,dtype='string')
@@ -508,6 +618,14 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
 
 #########################
 def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
+    """
+
+    flatlist:
+    bias:
+    output:
+    trim:
+    :return:
+    """
     # read the bias in, BUT we don't know if it's the numpy array or file name
     if isinstance(bias, str):
         # read in file if a string
@@ -559,9 +677,29 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
-    # use trace1=True if only perform aperture trace on first object in
-    # speclist. Useful if e.g. science targets are faint, and first object
-    # is a bright standard star
+    """
+
+    speclist:
+    flatlist:
+    biaslist:
+    HeNeAr_file:
+    trace1:
+        use trace1=True if only perform aperture trace on first object in
+        speclist. Useful if e.g. science targets are faint, and first object
+        is a bright standard star
+    ntracesteps:
+    apwidth:
+    skysep:
+    skywidth:
+    HeNeAr_interac:
+    HeNeAr_tol:
+    HeNeAr_order:
+    displayHeNeAr:
+    trim:
+    write_reduced:
+    display:
+    :return:
+    """
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim = True)

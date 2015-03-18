@@ -49,16 +49,29 @@ def gaus(x,a,b,x0,sigma):
 
 #########################
 def ap_trace(img, fmask=(1,), nsteps=50):
-    """Trace the spectrum aperture in an image
+    """
+    Trace the spectrum aperture in an image
 
     Assumes wavelength axis is along the X, spatial axis along the Y.
     Chops image up in bix along the wavelength direction, fits a Gaussian
     within each bin to determine the spatial center of the trace. Finally,
     draws a cubic spline through the bins to up-sample the trace.
 
-    Keyword arguments:
-    nsteps -- Number of bins in X direction to chop image into (default 50)
-    fmask -- A list of illuminated rows in the spatial direction (Y), as returned by flatcombine. (optional)
+    Parameters
+    ----------
+    nsteps : int, optional
+        Number of bins in X direction to chop image into. Use fewer bins
+        if ap_trace is having difficulty, such as for faint targets
+        (default is 50, minimum is 4)
+    fmask : array-like, optional
+        A list of illuminated rows in the spatial direction (Y), as
+        returned by flatcombine.
+
+    Returns
+    -------
+    my : array
+        The spatial (Y) positions of the trace, interpolated over the
+        entire wavelength (X) axis
     """
     print('Tracing Aperture using nsteps='+str(nsteps))
     # the valid y-range of the chip
@@ -115,7 +128,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
 #########################
 def ap_extract(img, trace, apwidth=5.0):
     """Extract the spectrum using the trace
-    
+
     """
     # simply add up the total flux around the trace +/- width
     onedspec = np.zeros_like(trace)

@@ -199,8 +199,14 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
         The width along the Y axis of the trace to extract. Note: a fixed
         width is used along the whole trace. (default is 5 pixels)
     skysep : int, optional
+        The separation in pixels from the aperture to the sky window.
+        (Default is 25)
     skywidth : int, optional
+        The width in pixels of the sky windows on either side of the
+        aperture. (Default is 75)
     skydeg : int, optional
+        The polynomial order to fit between the sky windows.
+        (Default is 2)
 
     Returns
     -------
@@ -246,28 +252,33 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 
     Parameters
     ----------
-    calimage : string
+    calimage : str
         Path to the HeNeAr calibration image
-    linelist : string, optional
+    linelist : str, optional
         Path to the linelist file to use. Only needed if using the
         automatic mode.
     interac : bool, optional
         Should the HeNeAr identification be done interactively (manually)?
         (Default is True)
     trim : bool, optional
-        (Default is True)
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
     fmask : array-like, optional
         A list of illuminated rows in the spatial direction (Y), as
         returned by flatcombine.
     display : bool, optional
     tol : int, optional
-        (Default is 10)
+        When in automatic mode, the tolerance in pixel units between
+        linelist entries and estimated wavelengths for the first few
+        lines matched... use carefully. (Default is 10)
     fit_order : int, optional
-        (Default is 2)
+        The polynomial order to use to interpolate between identified
+        peaks in the HeNeAr (Default is 2)
 
     Returns
     -------
-    wfit :
+    wfit : bivariate spline object
+        The wavelength evaluated at every pixel
     """
 
     print('Running HeNeAr_fit function.')
@@ -565,10 +576,21 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 ##########################
 def mapwavelength(trace, wavemap):
     """
+    Compute the wavelength along the center of the trace, to be run after
+    the HeNeAr_fit routine.
 
-    trace:
-    wavemap:
-    :return:
+    Parameters
+    ----------
+    trace : 1-d array
+        The spatial positions (Y axis) corresponding to the center of the
+        trace for every wavelength (X axis), as returned from ap_trace
+    wavemap : bivariate spline object
+        The wavelength evaluated at every pixel, output from HeNeAr_fit
+
+    Returns
+    -------
+    trace_wave : 1d array
+        The wavelength vector evaluated at each position along the trace
     """
     # use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
     trace_wave = wavemap.ev(np.arange(len(trace)), trace)
@@ -581,12 +603,25 @@ def mapwavelength(trace, wavemap):
 #########################
 def biascombine(biaslist, output='BIAS.fits', trim=True):
     """
+    Combine the bias frames in to a master bias image. Currently only
+    supports median combine.
 
-    biaslist:
-    output:
-    trim:
-    :return:
+    Parameters
+    ----------
+    biaslist : str
+        Path to file containing list of bias images.
+    output: str, optional
+        Name of the master bias image to write. (Default is "BIAS.fits")
+    trim : bool, optional
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
+
+    Returns
+    -------
+    bias : 2-d array
+        The median combined master bias image
     """
+
     # assume biaslist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
     files = np.loadtxt(biaslist,dtype='string')
@@ -619,12 +654,25 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
 #########################
 def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
     """
+    Combine the flat frames in to a master flat image. Subtracts the
+    master bias image first from each flat image. Currently only
+    supports median combining the images.
 
-    flatlist:
-    bias:
-    output:
-    trim:
-    :return:
+    flatlist : str
+        Path to file containing list of flat images.
+    bias : str or 2-d array
+        Either the path to the master bias image (str) or
+        the output from 2-d array output from biascombine
+    output: str, optional
+        Name of the master flat image to write. (Default is "FLAT.fits")
+    trim : bool, optional
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
+
+    Returns
+    -------
+    flat : 2-d array
+        The median combined master flat
     """
     # read the bias in, BUT we don't know if it's the numpy array or file name
     if isinstance(bias, str):
@@ -678,27 +726,65 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
     """
+    A wrapper routine to carry out the full steps of the spectral
+    reduction and calibration. Steps include:
+    1) combines bias and flat images
+    2) maps wavelength in the HeNeAr image
+    3) perform simple image reduction: Data = (Raw - Bias)/Flat
+    4) trace spectral aperture
+    5) extract spectrum
+    6) measure sky along extracted spectrum
+    7) write output files
 
-    speclist:
-    flatlist:
-    biaslist:
-    HeNeAr_file:
-    trace1:
+    speclist : str
+        Path to file containing list of science images.
+    flatlist : str
+        Path to file containing list of flat images.
+    biaslist : str
+        Path to file containing list of bias images.
+    HeNeAr_file : str
+        Path to the HeNeAr calibration image
+    trace1 : bool, optional
         use trace1=True if only perform aperture trace on first object in
-        speclist. Useful if e.g. science targets are faint, and first object
-        is a bright standard star
-    ntracesteps:
-    apwidth:
-    skysep:
-    skywidth:
-    HeNeAr_interac:
-    HeNeAr_tol:
-    HeNeAr_order:
-    displayHeNeAr:
-    trim:
-    write_reduced:
-    display:
-    :return:
+        speclist. Useful if e.g. science targets are faint, and first
+        object is a bright standard star. Note: assumes star placed at
+        same position in spatial direction. (Default is False)
+    ntracesteps : int, optional
+        Number of bins in X direction to chop image into. Use
+        fewer bins if ap_trace is having difficulty, such as with faint
+        targets (default here is 25, minimum is 4)
+    apwidth : int, optional
+        The width along the Y axis of the trace to extract. Note: a fixed
+        width is used along the whole trace. (default here is 3 pixels)
+    skysep : int, optional
+        The separation in pixels from the aperture to the sky window.
+        (Default is 25)
+    skywidth : int, optional
+        The width in pixels of the sky windows on either side of the
+        aperture. (Default is 75)
+    HeNeAr_interac : bool, optional
+        Should the HeNeAr identification be done interactively (manually)?
+        (Default here is False)
+    HeNeAr_tol : int, optional
+        When in automatic mode, the tolerance in pixel units between
+        linelist entries and estimated wavelengths for the first few
+        lines matched... use carefully. (Default here is 20)
+    HeNeAr_order : int, optional
+        The polynomial order to use to interpolate between identified
+        peaks in the HeNeAr (Default is 2)
+    displayHeNeAr : bool, optional
+    trim : bool, optional
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
+    write_reduced : bool, optional
+        Set to True to write output files, including the .spec file with
+        columns (wavelength, flux); the .trace file with columns
+        (X pixel number, Y pixel of trace); .log file with record of
+        settings used in this routine for reduction. (Default is True)
+    display : bool, optional
+        Set to True to display intermediate steps along the way.
+        (Default is True)
+
     """
 
     # assume specfile is a list of file names of object
@@ -736,7 +822,6 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # with reduced data, trace the aperture
         if (i==0) or (trace1 is False):
             trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
-
 
         # extract the spectrum
         ext_spec = ap_extract(data, trace, apwidth=apwidth)

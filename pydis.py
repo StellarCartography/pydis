@@ -658,6 +658,8 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
     master bias image first from each flat image. Currently only
     supports median combining the images.
 
+    Parameters
+    ----------
     flatlist : str
         Path to file containing list of flat images.
     bias : str or 2-d array
@@ -736,6 +738,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     6) measure sky along extracted spectrum
     7) write output files
 
+    Parameters
+    ----------
     speclist : str
         Path to file containing list of science images.
     flatlist : str

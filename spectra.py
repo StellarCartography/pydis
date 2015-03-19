@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-A simple one dimensional spectra reduction and analysis package
-
-Created on Mon Mar  2 17:40:42 2015
-
-@author: jradavenport, with help by jruan
+SPECTRA: A simple one dimensional spectra reduction and analysis package
 
 Created with the Apache Point Observatory (APO) 3.5-m telescope's
 Dual Imaging Spectrograph (DIS) in mind. YMMV
@@ -13,16 +9,6 @@ e.g. DIS specifics:
 - have BLUE/RED channels
 - hand-code in that the RED channel wavelength is backwards
 - dispersion along the X, spatial along the Y axis
-
-+++
-Steps to simple reduction from image to 1dspec:
-
-1. flat and bias correct (easy)
-2. identify lines in wavelength cal image (HeNeAr) and define the
-    wavelength solution in 2D space
-3. trace the object spectrum, define aperture and sky regions
-4. extract object, subtract sky, interpolate wavelength space
-5. flux calibrate (not yet)
 
 """
 

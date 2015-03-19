@@ -1,20 +1,20 @@
-# pyDIS
+# *SPECTRA*
 A simple reduction package for one dimensional longslit spectroscopy using Python.
 
 ## Examples
 ### Auto-reduce my data!
 
-The goal is to make pyDIS as easy to use while observing as possible. Here is an example of a script you might run over and over throughout the night:
+The goal is to make SPECTRA as easy to use while observing as possible. Here is an example of a script you might run over and over throughout the night:
 
 ````python 
-# if pyDIS isn't in the currnet working directory, add to path
+# if SPECTRA isn't in the currnet working directory, add to path
 import sys
-sys.path.append('/path/to/stuff/pyDIS/')
+sys.path.append('/path/to/spectra/')
 
 # must import, of course
-import pydis
+import spectra
     
-pydis.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
+spectra.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
                  'HeNeAr.0005r.fits', HeNeAr_interac=False)
 ````
 
@@ -38,8 +38,8 @@ Master flat and bias files (FLAT.fits and BIAS.fits by default), trace files wit
 You can also use each component of the reduction process. For example, if you wanted to combine all your flat and bias frames:
 
 ````python 
-bias = pydis.biascombine('biaslist.txt')
-flat, mask = pydis.flatcombine('flatlist.txt', bias)
+bias = spectra.biascombine('biaslist.txt')
+flat, mask = spectra.flatcombine('flatlist.txt', bias)
 ````
 
 The resulting flat and bias frames are returned as numpy arrays. By default these functions will write files called **BIAS.fits** and **FLAT.fits**, unless a different name is specified using the `output = 'file.fits'` keyword.
@@ -72,7 +72,7 @@ Really slick tools exist for on-the-fly photometry analysis. However, no turn-ke
 - The more hands-free the better, a full reduction script needs to be available
 - A fully interactive mode (a la IRAF) should be available for each task
 
-So far pyDIS can do a rough job of all the reduction tasks, except flux calibration, for single point sources objects. We are seeking more data to test it against, to help refine the solution and find bugs. Here is one example of a hands-free reduced M dwarf spectrum versus the manual IRAF reduction:
+So far SPECTRA can do a rough job of all the reduction tasks, except flux calibration, for single point sources objects. We are seeking more data to test it against, to help refine the solution and find bugs. Here is one example of a hands-free reduced M dwarf spectrum versus the manual IRAF reduction (note: pyDIS has become SPECTRA)
 
 ![Imgur](http://i.imgur.com/IjXdt39l.png)
 

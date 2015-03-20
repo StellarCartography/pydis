@@ -798,6 +798,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
         else:
             raw = hdu[0].data
+
+        exptime = hdu[0].header['EXPTIME']
         hdu.close(closed=True)
 
         # remove bias and flat
@@ -841,6 +843,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
         wfinal = mapwavelength(trace, wfit)
 
+        ffinal = (ext_spec - sky) / exptime
         if write_reduced is True:
             # write file with the trace (y positions)
             tout = open(spec+'.trace','w')
@@ -853,7 +856,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             fout = open(spec+'.spec','w')
             fout.write('#  This file contains the final extracted wavelength,counts data \n')
             for k in range(len(wfinal)):
-                fout.write(str(wfinal[k]) + ', ' + str(ext_spec[k]-sky[k]) + '\n')
+                fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + '\n')
             fout.close()
 
             now = datetime.datetime.now()
@@ -875,13 +878,13 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
         # the final figure to plot
         plt.figure()
-        plt.plot(wfinal, ext_spec-sky)
+        plt.plot(wfinal, ffinal)
         plt.xlabel('Wavelength')
-        plt.ylabel('Counts')
+        plt.ylabel('Counts / sec')
         plt.title(spec)
         #plot within percentile limits
-        plt.ylim( (np.percentile(ext_spec-sky,2),
-                   np.percentile(ext_spec-sky,98)) )
+        plt.ylim( (np.percentile(ffinal,2),
+                   np.percentile(ffinal,98)) )
         plt.show()
 
     return

@@ -21,6 +21,7 @@ import matplotlib.cm as cm
 from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
+from astropy.convolution import convolve, Box1DKernel
 import scipy.signal
 import datetime
 import os
@@ -638,7 +639,8 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
     return bias
 
 #########################
-def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
+def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
+                display=False, flat_poly=5):
     """
     Combine the flat frames in to a master flat image. Subtracts the
     master bias image first from each flat image. Currently only
@@ -656,6 +658,10 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
     trim : bool, optional
         Trim the image using the DATASEC keyword in the header, assuming
         has format of [0:1024,0:512] (Default is True)
+    display : bool, optional
+        Set to True to show 1d flat, and final flat (Default is False)
+    flat_poly : int, optional
+        Polynomial order to fit 1d flat curve with. (Default is 5)
 
     Returns
     -------
@@ -695,16 +701,44 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True):
             all_data = np.dstack( (all_data, im_i / np.median(im_i[ok,:])) )
         hdu_i.close(closed=True)
 
-    # do median across whole stack
-    flat = np.median(all_data, axis=2)
-    # need other scaling?
+    # do median across whole stack of flat images
+    flat_stack = np.median(all_data, axis=2)
+
+    xdata = np.arange(all_data.shape[1]) # x pixels
+
+    # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
+    flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
+
+    # fit log flux with polynomial
+    flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
+    # get rid of log
+    flat_curve = 10.0**np.polyval(flat_fit, xdata)
+
+    if display is True:
+        plt.figure()
+        plt.plot(10.0**flat_1d)
+        plt.plot(xdata, flat_curve,'r')
+        plt.show()
+
+
+    # divide median stacked flat by this response curve
+    flat = np.zeros_like(flat_stack)
+    for i in range(flat_stack.shape[0]):
+        flat[i,:] = flat_stack[i,:] / flat_curve
+
+    # normalize flat
+    flat = flat / np.median(flat[ok,:])
+
+    if display is True:
+        plt.figure()
+        plt.imshow(flat, origin='lower',aspect='auto')
+        plt.show()
 
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(flat)
     hduOut.writeto(output, clobber=True)
+
     return flat ,ok[0]
-# i want to return the flat "OK" mask to use later,
-# but only optionally.... need to make a flat class!
 
 
 #########################

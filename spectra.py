@@ -110,7 +110,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     mybins = ybins[:-1]
 
     # run a cubic spline thru the bins
-    ap_spl = UnivariateSpline(mxbins, mybins, ext=0, k=3)
+    ap_spl = UnivariateSpline(mxbins, mybins, ext=0, k=3, s=0)
 
     # interpolate the spline to 1 position per column
     mx = np.arange(0,img.shape[1])
@@ -720,8 +720,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
         plt.plot(xdata, flat_curve,'r')
         plt.show()
 
-
-    # divide median stacked flat by this response curve
+    # divide median stacked flat by this RESPONSE curve
     flat = np.zeros_like(flat_stack)
     for i in range(flat_stack.shape[0]):
         flat[i,:] = flat_stack[i,:] / flat_curve

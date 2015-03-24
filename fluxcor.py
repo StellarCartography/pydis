@@ -20,6 +20,7 @@ from numpy.polynomial import chebyshev
 
 
 def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
+    # not yet
     if (poly is False) and (spline is False):
         poly=True
 
@@ -35,10 +36,14 @@ def _mag2flux(mag, zeropt=21.10):
 
 
 def AirmassCor(obj_wave, obj_flux, airmass):
+    # read in the airmass curve for APO
     dir = os.path.dirname(os.path.realpath(__file__))
-    air_wave, air_trans = np.loadtxt(dir+'/resources/apoextinct.dat',unpack=True,skiprows=2)
+    air_wave, air_trans = np.loadtxt(dir+'/resources/apoextinct.dat',
+                                     unpack=True,skiprows=2)
+
+    #this isnt quite right...
     airmass_ext = np.interp(obj_wave, air_wave, air_trans) / airmass
-    return airmass_ext
+    return airmass_ext * obj_flux
 
 
 def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
@@ -57,10 +62,12 @@ def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
     obj_wave, obj_cts = np.loadtxt(dir+'/G191B2B.0020r.fits.spec',skiprows=1,
                                    unpack=True,delimiter=',')
 
+    #-- should we down-sample the template?
     # std_wave = np.arange(np.nanmin(obj_wave), np.nanmax(obj_wave),
     #                      np.mean(np.abs(std_wave0[1:]-std_wave0[:-1])))
     # std_flux = np.interp(std_wave, std_wave0, std_flux0)
 
+    #-- don't down-sample the template
     std_wave = std_wave0
     std_flux = std_flux0
 
@@ -86,8 +93,6 @@ def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
     ratio = np.array(std_flux_ds,dtype='float') / np.array(obj_cts_ds,dtype='float')
 
     ratio_spl = UnivariateSpline(obj_wave_ds, ratio, ext=0, k=3 ,s=0)
-    # ratio_fit = np.polyfit(obj_wave_ds, ratio, 11)
-    # ratio_chb = chebyshev.chebfit(obj_wave_ds, ratio, 9)
 
     # the width of each pixel (in angstroms)
     dw_tmp = obj_wave[1:]-obj_wave[:-1]
@@ -96,15 +101,11 @@ def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
     plt.figure()
     plt.plot(obj_wave_ds, ratio, 'ko')
     plt.plot(obj_wave, ratio_spl(obj_wave),'r')
-    # plt.plot(obj_wave, np.polyval(ratio_fit, obj_wave),'g')
-    # plt.plot(obj_wave, chebyshev.chebval(obj_wave,ratio_chb),'b')
     plt.ylabel('(erg/s/cm2/A) / (counts/s)')
     plt.show()
 
-
+    # this still isnt quite the sensfunc we want...
     sens = ratio_spl(obj_wave)
-    # sens2 = np.polyval(ratio_fit, obj_wave)
-    # sens3 = chebyshev.chebval(obj_wave,ratio_chb)
 
 
     plt.figure()

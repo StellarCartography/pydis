@@ -90,7 +90,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
 
 
 def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
-                display=False, flat_poly=5):
+                display=False, flat_poly=5, response=True):
     """
     Combine the flat frames in to a master flat image. Subtracts the
     master bias image first from each flat image. Currently only
@@ -103,15 +103,21 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
     bias : str or 2-d array
         Either the path to the master bias image (str) or
         the output from 2-d array output from biascombine
-    output: str, optional
+    output : str, optional
         Name of the master flat image to write. (Default is "FLAT.fits")
+    response : bool, optional
+        If set to True, first combines the median image stack along the
+        spatial (Y) direction, then fits polynomial to 1D curve, then
+        divides each row in flat by this structure. This nominally divides
+        out the spectrum of the flat field lamp. (Default is True)
     trim : bool, optional
         Trim the image using the DATASEC keyword in the header, assuming
         has format of [0:1024,0:512] (Default is True)
     display : bool, optional
         Set to True to show 1d flat, and final flat (Default is False)
     flat_poly : int, optional
-        Polynomial order to fit 1d flat curve with. (Default is 5)
+        Polynomial order to fit 1d flat curve with. Only used if
+        response is set to True. (Default is 5)
 
     Returns
     -------
@@ -154,26 +160,29 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
     # do median across whole stack of flat images
     flat_stack = np.median(all_data, axis=2)
 
-    xdata = np.arange(all_data.shape[1]) # x pixels
+    if response is True:
+        xdata = np.arange(all_data.shape[1]) # x pixels
 
-    # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
-    flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
+        # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
+        flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
 
-    # fit log flux with polynomial
-    flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
-    # get rid of log
-    flat_curve = 10.0**np.polyval(flat_fit, xdata)
+        # fit log flux with polynomial
+        flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
+        # get rid of log
+        flat_curve = 10.0**np.polyval(flat_fit, xdata)
 
-    if display is True:
-        plt.figure()
-        plt.plot(10.0**flat_1d)
-        plt.plot(xdata, flat_curve,'r')
-        plt.show()
+        if display is True:
+            plt.figure()
+            plt.plot(10.0**flat_1d)
+            plt.plot(xdata, flat_curve,'r')
+            plt.show()
 
-    # divide median stacked flat by this RESPONSE curve
-    flat = np.zeros_like(flat_stack)
-    for i in range(flat_stack.shape[0]):
-        flat[i,:] = flat_stack[i,:] / flat_curve
+        # divide median stacked flat by this RESPONSE curve
+        flat = np.zeros_like(flat_stack)
+        for i in range(flat_stack.shape[0]):
+            flat[i,:] = flat_stack[i,:] / flat_curve
+    else:
+        flat = flat_stack
 
     # normalize flat
     flat = flat / np.median(flat[ok,:])

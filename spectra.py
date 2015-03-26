@@ -38,6 +38,37 @@ def _gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 
+def _OpenImg(file, trim=True):
+    """
+    A simple wrapper for astropy.io.fits (pyfits) to open and extract
+    the data we want from images and headers.
+
+    Parameters
+    ----------
+    file : string
+        The path to the image to open
+    trim : bool, optional
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
+
+    Returns
+    -------
+    image, exptime, airmass
+    """
+
+    hdu = fits.open(file)
+    if trim is True:
+        datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+        d = map(float, datasec)
+        raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+    else:
+        raw = hdu[0].data
+    airmass = hdu[0].header['AIRMASS']
+    exptime = hdu[0].header['EXPTIME']
+    hdu.close(closed=True)
+    return raw, exptime, airmass
+
+
 def biascombine(biaslist, output='BIAS.fits', trim=True):
     """
     Combine the bias frames in to a master bias image. Currently only
@@ -900,8 +931,8 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, cal_flux):
     return
 
 #########################
-def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-               trace1=False, ntracesteps=25,
+def autoreduce(speclist, flatlist, biaslist, HeNeAr_file, stdobs='',
+               stdstar='', trace1=False, ntracesteps=25,
                apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
@@ -977,24 +1008,20 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
+    if (len(stdobs)>0 and len(stdstar)>0):
+        raw, exptime, stdair = _OpenImg(stdobs, trim=trim)
+
+        stddata = (raw - bias) / flat
+
+        sensfunc = DefFluxCal(stddata, stdstar=stdstar, airmass=stdair)
+
+
     # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')
 
     for i in range(len(specfile)):
         spec = specfile[i]
-
-        hdu = fits.open(spec)
-        if trim is True:
-            datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-            d = map(float, datasec)
-            raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
-        else:
-            raw = hdu[0].data
-
-        exptime = hdu[0].header['EXPTIME']
-        airmass = hdu[0].header['AIRMASS']
-
-        hdu.close(closed=True)
+        raw, exptime, airmass = _OpenImg(spec, trim=trim)
 
         # remove bias and flat
         data = (raw - bias) / flat

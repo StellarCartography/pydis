@@ -453,6 +453,8 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 
     ######   IDENTIFY   (auto and interac modes)
     if interac is False:
+        print("Doing automatic wavelength calibration on HeNeAr.")
+        print("Note, this is not very robust. Suggest you re-run with interac=True")
         # find the linelist of choice
         if (len(linelist)==0):
             dir = os.path.dirname(os.path.realpath(__file__))
@@ -553,6 +555,8 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         # update the "wtemp" vector that goes with "slice" (fluxes)
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
+
+    # = = = = = = = = = = = = = = = =
     elif interac is True:
 
         print('')
@@ -655,17 +659,27 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 else:
                     pass
 
-        test = InteracWave()
-        plt.show()
+        # run the interactive program
+        wavefit = InteracWave()
+        plt.show() #activate the display - GO!
 
-        pcent = np.array(test.pcent,dtype='float')
-        wcent = np.array(test.wcent, dtype='float')
-        print(pcent)
-        print(wcent)
+        # how I would LIKE to do this interactively:
+        # inside the interac mode, do a split panel, live-updated with
+        # the wavelength solution, and where user can edit the fit_order
+
+        # how I WILL do it instead
+        # a crude while loop here, just to get things moving
+
+        # after interactive fitting done, get results fit peaks
+        pcent = np.array(wavefit.pcent,dtype='float')
+        wcent = np.array(wavefit.wcent, dtype='float')
 
         # fit polynomial thru the peak wavelengths
         coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+
+    # = = = = = = = = = = = = = = = = = =
+    # now wavelength is found, either via interactive or auto mode!
 
     #-- trace the peaks vertically
     # how far can the trace be bent, i.e. how big a window to fit over?

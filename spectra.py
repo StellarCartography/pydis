@@ -376,7 +376,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
-               tol=10,fit_order=2):
+               tol=10, fit_order=2):
     """
     Determine the wavelength solution to be used for the science images.
     Can be done either automatically (buyer beware) or manually. Both the
@@ -560,7 +560,8 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         print('1) Click on HeNeAr lines in plot window')
         print('2) Enter corresponding wavelength in terminal and press <return>')
         print('   If mis-click or unsure, just press leave blank and press <return>')
-        print('3) Close plot window when finished')
+        print('3) To delete an entry, click on label, enter "d" in terminal, press <return>')
+        print('4) Close plot window when finished')
 
         xraw = np.arange(len(slice))
         class InteracWave:
@@ -572,8 +573,9 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 plt.xlabel('Wavelength')
                 plt.ylabel('Counts')
 
-                self.pcent = []
-                self.wcent = []
+                self.pcent = [] # the pixel centers of the identified lines
+                self.wcent = [] # the labeled wavelengths of the lines
+                self.ixlib = [] # library of click points
 
                 self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
                                      color='red', linewidth=1 )
@@ -587,6 +589,8 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                 # http://stackoverflow.com/questions/20711148/ignore-matplotlib-cursor-widget-when-toolbar-widget-selected
                 if self.fig.canvas.manager.toolbar._active is None:
                     ix = event.xdata
+
+                    # if the click is in good space, proceed
                     if (ix is not None) and (ix > np.nanmin(slice)) and (ix < np.nanmax(slice)):
                         # disable button event connection
                         self.disconnect(self.clickCid)
@@ -595,10 +599,28 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                         self.cursor.disconnect_events()
                         self.cursor._update()
 
+                        # get points nearby to the click
                         nearby = np.where((wtemp > ix-10*disp_approx) &
                                           (wtemp < ix+10*disp_approx) )
 
-                        if (len(nearby[0]) > 4):
+                        # find if click is too close to an existing click (overlap)
+                        kill = None
+                        if len(self.pcent)>0:
+                            print("YES")
+                            for k in range(len(self.pcent)):
+                                print(np.abs(self.ixlib[k]-ix), tol)
+                                if np.abs(self.ixlib[k]-ix)<tol:
+                                    kill_d = raw_input('> WARNING: Click too close to existing point. To delete existing point, enter "d"')
+                                    if kill_d=='d':
+                                        kill = k
+                            if kill is not None:
+                                del(self.pcent[kill])
+                                del(self.wcent[kill])
+                                del(self.ixlib[kill])
+
+
+                        # If there are enough valid points to possibly fit a peak too...
+                        if (len(nearby[0]) > 4) and (kill is None):
                             imax = np.nanargmax(slice[nearby])
 
                             pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
@@ -617,12 +639,13 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                                 number=float(raw_input('> Enter Wavelength: '))
                                 self.pcent.append(popt[2])
                                 self.wcent.append(number)
+                                self.ixlib.append((ix))
                                 self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
                                 print('  Saving '+str(number))
                             except ValueError:
                                 print "> Warning: Not a valid wavelength float!"
 
-                        else:
+                        elif (kill is None):
                             print('> Error: No valid data near click!')
 
                         # reconnect to cursor and button event

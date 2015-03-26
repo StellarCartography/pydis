@@ -28,13 +28,168 @@ import os
 from matplotlib.widgets import Cursor
 
 
-#0000000000000000000000000000
+
+def _mag2flux(mag, zeropt=21.10):
+    flux = 10.0**( (mag + zeropt) / (-2.5) )
+    return flux
+
 def _gaus(x,a,b,x0,sigma):
     """ Simple Gaussian function, for internal use only """
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 
-#########################
+def biascombine(biaslist, output='BIAS.fits', trim=True):
+    """
+    Combine the bias frames in to a master bias image. Currently only
+    supports median combine.
+
+    Parameters
+    ----------
+    biaslist : str
+        Path to file containing list of bias images.
+    output: str, optional
+        Name of the master bias image to write. (Default is "BIAS.fits")
+    trim : bool, optional
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
+
+    Returns
+    -------
+    bias : 2-d array
+        The median combined master bias image
+    """
+
+    # assume biaslist is a simple text file with image names
+    # e.g. ls flat.00*b.fits > bflat.lis
+    files = np.loadtxt(biaslist,dtype='string')
+
+    for i in range(0,len(files)):
+        hdu_i = fits.open(files[i])
+
+        if trim is False:
+            im_i = hdu_i[0].data
+        if trim is True:
+            datasec = hdu_i[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+            d = map(float, datasec)
+            im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+
+        # create image stack
+        if (i==0):
+            all_data = im_i
+        elif (i>0):
+            all_data = np.dstack( (all_data, im_i) )
+        hdu_i.close(closed=True)
+
+    # do median across whole stack
+    bias = np.median(all_data, axis=2)
+
+    # write output to disk for later use
+    hduOut = fits.PrimaryHDU(bias)
+    hduOut.writeto(output, clobber=True)
+    return bias
+
+
+def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
+                display=False, flat_poly=5):
+    """
+    Combine the flat frames in to a master flat image. Subtracts the
+    master bias image first from each flat image. Currently only
+    supports median combining the images.
+
+    Parameters
+    ----------
+    flatlist : str
+        Path to file containing list of flat images.
+    bias : str or 2-d array
+        Either the path to the master bias image (str) or
+        the output from 2-d array output from biascombine
+    output: str, optional
+        Name of the master flat image to write. (Default is "FLAT.fits")
+    trim : bool, optional
+        Trim the image using the DATASEC keyword in the header, assuming
+        has format of [0:1024,0:512] (Default is True)
+    display : bool, optional
+        Set to True to show 1d flat, and final flat (Default is False)
+    flat_poly : int, optional
+        Polynomial order to fit 1d flat curve with. (Default is 5)
+
+    Returns
+    -------
+    flat : 2-d array
+        The median combined master flat
+    """
+    # read the bias in, BUT we don't know if it's the numpy array or file name
+    if isinstance(bias, str):
+        # read in file if a string
+        bias_im = fits.open(bias)[0].data
+    else:
+        # assume is proper array from biascombine function
+        bias_im = bias
+
+    # assume flatlist is a simple text file with image names
+    # e.g. ls flat.00*b.fits > bflat.lis
+    files = np.loadtxt(flatlist,dtype='string')
+
+    for i in range(0,len(files)):
+        hdu_i = fits.open(files[i])
+        if trim is False:
+            im_i = hdu_i[0].data - bias_im
+        if trim is True:
+            datasec = hdu_i[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+            d = map(float, datasec)
+            im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]] - bias_im
+
+        # check for bad regions (not illuminated) in the spatial direction
+        ycomp = im_i.sum(axis=1) # compress to y-axis only
+        illum_thresh = 0.8 # value compressed data must reach to be used for flat normalization
+        ok = np.where( (ycomp>= np.median(ycomp)*illum_thresh) )
+
+        # assume a median scaling for each flat to account for possible different exposure times
+        if (i==0):
+            all_data = im_i / np.median(im_i[ok,:])
+        elif (i>0):
+            all_data = np.dstack( (all_data, im_i / np.median(im_i[ok,:])) )
+        hdu_i.close(closed=True)
+
+    # do median across whole stack of flat images
+    flat_stack = np.median(all_data, axis=2)
+
+    xdata = np.arange(all_data.shape[1]) # x pixels
+
+    # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
+    flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
+
+    # fit log flux with polynomial
+    flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
+    # get rid of log
+    flat_curve = 10.0**np.polyval(flat_fit, xdata)
+
+    if display is True:
+        plt.figure()
+        plt.plot(10.0**flat_1d)
+        plt.plot(xdata, flat_curve,'r')
+        plt.show()
+
+    # divide median stacked flat by this RESPONSE curve
+    flat = np.zeros_like(flat_stack)
+    for i in range(flat_stack.shape[0]):
+        flat[i,:] = flat_stack[i,:] / flat_curve
+
+    # normalize flat
+    flat = flat / np.median(flat[ok,:])
+
+    if display is True:
+        plt.figure()
+        plt.imshow(flat, origin='lower',aspect='auto')
+        plt.show()
+
+    # write output to disk for later use
+    hduOut = fits.PrimaryHDU(flat)
+    hduOut.writeto(output, clobber=True)
+
+    return flat ,ok[0]
+
+
 def ap_trace(img, fmask=(1,), nsteps=50):
     """
     Trace the spectrum aperture in an image
@@ -118,7 +273,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     return my
 
 
-#########################
+
 def ap_extract(img, trace, apwidth=5.0):
     """
     Extract the spectrum using the trace. Simply add up all the flux
@@ -164,7 +319,7 @@ def ap_extract(img, trace, apwidth=5.0):
     return onedspec
 
 
-#########################
+
 def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
     """
     Fits a polynomial to the sky at each column
@@ -218,7 +373,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
     return skysubflux
 
 
-##########################
+
 def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
                tol=10,fit_order=2):
@@ -560,7 +715,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
     # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
     return wfit
 
-##########################
+
 def mapwavelength(trace, wavemap):
     """
     Compute the wavelength along the center of the trace, to be run after
@@ -587,158 +742,103 @@ def mapwavelength(trace, wavemap):
     return trace_wave
 
 
-#########################
-def biascombine(biaslist, output='BIAS.fits', trim=True):
-    """
-    Combine the bias frames in to a master bias image. Currently only
-    supports median combine.
 
-    Parameters
-    ----------
-    biaslist : str
-        Path to file containing list of bias images.
-    output: str, optional
-        Name of the master bias image to write. (Default is "BIAS.fits")
-    trim : bool, optional
-        Trim the image using the DATASEC keyword in the header, assuming
-        has format of [0:1024,0:512] (Default is True)
+def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
+    # not yet
+    if (poly is False) and (spline is False):
+        poly=True
 
-    Returns
-    -------
-    bias : 2-d array
-        The median combined master bias image
-    """
+    if (poly is True):
+        print("yes")
 
-    # assume biaslist is a simple text file with image names
-    # e.g. ls flat.00*b.fits > bflat.lis
-    files = np.loadtxt(biaslist,dtype='string')
+    return
 
-    for i in range(0,len(files)):
-        hdu_i = fits.open(files[i])
 
-        if trim is False:
-            im_i = hdu_i[0].data
-        if trim is True:
-            datasec = hdu_i[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-            d = map(float, datasec)
-            im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]]
+def AirmassCor(obj_wave, obj_flux, airmass):
+    # read in the airmass curve for APO
+    dir = os.path.dirname(os.path.realpath(__file__))
+    air_wave, air_trans = np.loadtxt(dir+'/resources/apoextinct.dat',
+                                     unpack=True,skiprows=2)
 
-        # create image stack
-        if (i==0):
-            all_data = im_i
-        elif (i>0):
-            all_data = np.dstack( (all_data, im_i) )
-        hdu_i.close(closed=True)
+    #this isnt quite right...
+    airmass_ext = np.interp(obj_wave, air_wave, air_trans) / airmass
+    return airmass_ext * obj_flux
 
-    # do median across whole stack
-    bias = np.median(all_data, axis=2)
 
-    # write output to disk for later use
-    hduOut = fits.PrimaryHDU(bias)
-    hduOut.writeto(output, clobber=True)
-    return bias
+def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
+    stdstar = stdstar.lower()
+    # important! need to do calibrate in separate steps for airmass, sensfunc, etc
+    # also, need to be able to call it within main routines (from autoreduce)
 
-#########################
-def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
-                display=False, flat_poly=5):
-    """
-    Combine the flat frames in to a master flat image. Subtracts the
-    master bias image first from each flat image. Currently only
-    supports median combining the images.
+    dir = os.path.dirname(os.path.realpath(__file__))
+    onedstdpath = dir + '/resources/onedstds/spec50cal/'
 
-    Parameters
-    ----------
-    flatlist : str
-        Path to file containing list of flat images.
-    bias : str or 2-d array
-        Either the path to the master bias image (str) or
-        the output from 2-d array output from biascombine
-    output: str, optional
-        Name of the master flat image to write. (Default is "FLAT.fits")
-    trim : bool, optional
-        Trim the image using the DATASEC keyword in the header, assuming
-        has format of [0:1024,0:512] (Default is True)
-    display : bool, optional
-        Set to True to show 1d flat, and final flat (Default is False)
-    flat_poly : int, optional
-        Polynomial order to fit 1d flat curve with. (Default is 5)
+    std_wave0, std_mag, std_wth = np.loadtxt(onedstdpath + stdstar + '.dat',
+                                            skiprows=1, unpack=True)
+    std_flux0 = _mag2flux(std_mag)
 
-    Returns
-    -------
-    flat : 2-d array
-        The median combined master flat
-    """
-    # read the bias in, BUT we don't know if it's the numpy array or file name
-    if isinstance(bias, str):
-        # read in file if a string
-        bias_im = fits.open(bias)[0].data
-    else:
-        # assume is proper array from biascombine function
-        bias_im = bias
 
-    # assume flatlist is a simple text file with image names
-    # e.g. ls flat.00*b.fits > bflat.lis
-    files = np.loadtxt(flatlist,dtype='string')
+    obj_wave, obj_cts = np.loadtxt(dir+'/G191B2B.0020r.fits.spec',skiprows=1,
+                                   unpack=True,delimiter=',')
 
-    for i in range(0,len(files)):
-        hdu_i = fits.open(files[i])
-        if trim is False:
-            im_i = hdu_i[0].data - bias_im
-        if trim is True:
-            datasec = hdu_i[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-            d = map(float, datasec)
-            im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]] - bias_im
+    #-- should we down-sample the template?
+    # std_wave = np.arange(np.nanmin(obj_wave), np.nanmax(obj_wave),
+    #                      np.mean(np.abs(std_wave0[1:]-std_wave0[:-1])))
+    # std_flux = np.interp(std_wave, std_wave0, std_flux0)
 
-        # check for bad regions (not illuminated) in the spatial direction
-        ycomp = im_i.sum(axis=1) # compress to y-axis only
-        illum_thresh = 0.8 # value compressed data must reach to be used for flat normalization
-        ok = np.where( (ycomp>= np.median(ycomp)*illum_thresh) )
+    #-- don't down-sample the template
+    std_wave = std_wave0
+    std_flux = std_flux0
 
-        # assume a median scaling for each flat to account for possible different exposure times
-        if (i==0):
-            all_data = im_i / np.median(im_i[ok,:])
-        elif (i>0):
-            all_data = np.dstack( (all_data, im_i / np.median(im_i[ok,:])) )
-        hdu_i.close(closed=True)
 
-    # do median across whole stack of flat images
-    flat_stack = np.median(all_data, axis=2)
+    # down-sample (ds) the observed counts
+    obj_cts_ds = []
+    obj_wave_ds = []
+    std_flux_ds = []
+    for i in range(len(std_wave)):
+        rng = np.where((obj_wave>std_wave[i]) &
+                       (obj_wave<std_wave[i]+std_wth[i]) )
+        if (len(rng[0]) > 1):
+            obj_cts_ds.append(np.sum(obj_cts[rng])/std_wth[i])
+            obj_wave_ds.append(std_wave[i])
+            std_flux_ds.append(std_flux[i])
 
-    xdata = np.arange(all_data.shape[1]) # x pixels
+    plt.figure()
+    plt.plot(obj_wave, obj_cts,'b')
+    plt.plot(obj_wave_ds, obj_cts_ds, 'ro')
+    plt.xlabel('Wavelength')
+    plt.show()
 
-    # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
-    flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
+    ratio = np.array(std_flux_ds,dtype='float') / np.array(obj_cts_ds,dtype='float')
 
-    # fit log flux with polynomial
-    flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
-    # get rid of log
-    flat_curve = 10.0**np.polyval(flat_fit, xdata)
+    ratio_spl = UnivariateSpline(obj_wave_ds, ratio, ext=0, k=3 ,s=0)
 
-    if display is True:
-        plt.figure()
-        plt.plot(10.0**flat_1d)
-        plt.plot(xdata, flat_curve,'r')
-        plt.show()
+    # the width of each pixel (in angstroms)
+    dw_tmp = obj_wave[1:]-obj_wave[:-1]
+    dw = np.abs(np.append(dw_tmp, dw_tmp[-1]))
 
-    # divide median stacked flat by this RESPONSE curve
-    flat = np.zeros_like(flat_stack)
-    for i in range(flat_stack.shape[0]):
-        flat[i,:] = flat_stack[i,:] / flat_curve
+    plt.figure()
+    plt.plot(obj_wave_ds, ratio, 'ko')
+    plt.plot(obj_wave, ratio_spl(obj_wave),'r')
+    plt.ylabel('(erg/s/cm2/A) / (counts/s)')
+    plt.show()
 
-    # normalize flat
-    flat = flat / np.median(flat[ok,:])
+    # this still isnt quite the sensfunc we want...
+    sens = ratio_spl(obj_wave)
 
-    if display is True:
-        plt.figure()
-        plt.imshow(flat, origin='lower',aspect='auto')
-        plt.show()
 
-    # write output to disk for later use
-    hduOut = fits.PrimaryHDU(flat)
-    hduOut.writeto(output, clobber=True)
+    plt.figure()
+    plt.plot(std_wave0, std_flux0,'ko')
+    plt.plot(obj_wave, obj_cts/dw * sens,'r',alpha=0.5)
+    # plt.plot(obj_wave, obj_cts/dw * sens2,'g')
+    # plt.plot(obj_wave, obj_cts/dw * sens3,'b')
+    plt.title(stdstar)
+    plt.xlabel('Wavelength')
+    plt.ylabel('Flux (erg/s/cm2/A)')
+    plt.show()
 
-    return flat ,ok[0]
 
+    return
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,

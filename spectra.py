@@ -811,12 +811,12 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     """
 
     # assume specfile is a list of file names of object
-    bias = biascombine(biaslist, trim = True)
-    flat,fmask_out = flatcombine(flatlist, bias, trim=True)
+    bias = biascombine(biaslist, trim=trim)
+    flat,fmask_out = flatcombine(flatlist, bias, trim=trim)
 
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = HeNeAr_fit(HeNeAr_file, trim=True, fmask=fmask_out,interac=HeNeAr_interac,
-                      display=displayHeNeAr,tol=HeNeAr_tol,fit_order=HeNeAr_order)
+    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
+                      display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
     # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')

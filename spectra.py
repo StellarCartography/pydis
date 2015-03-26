@@ -754,18 +754,24 @@ def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
     return
 
 
-def AirmassCor(obj_wave, obj_flux, airmass):
+def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     # read in the airmass curve for APO
-    dir = os.path.dirname(os.path.realpath(__file__))
-    air_wave, air_trans = np.loadtxt(dir+'/resources/apoextinct.dat',
-                                     unpack=True,skiprows=2)
+    if len(airmass_file)==0:
+        dir = os.path.dirname(os.path.realpath(__file__))
+        air_wave, air_trans = np.loadtxt(dir+'/resources/apoextinct.dat',
+                                         unpack=True,skiprows=2)
+    else:
+        print('> Loading airmass library file: '+airmass_file)
+        print('  Note: first 2 rows are skipped, assuming header.')
+        air_wave, air_trans = np.loadtxt(airmass_file,
+                                         unpack=True,skiprows=2)
 
     #this isnt quite right...
     airmass_ext = np.interp(obj_wave, air_wave, air_trans) / airmass
     return airmass_ext * obj_flux
 
 
-def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
+def DefFluxCal(stdobs, stdstar='g191b2b', airmass=1.0):
     stdstar = stdstar.lower()
     # important! need to do calibrate in separate steps for airmass, sensfunc, etc
     # also, need to be able to call it within main routines (from autoreduce)
@@ -838,6 +844,13 @@ def calibrate(stdobs, stdstar='g191b2b', airmass=1.0):
     plt.show()
 
 
+    return
+
+
+def ApplyFluxCal(obj_wave, obj_flux, cal_wave, cal_flux):
+    # interp calibration (sensfunc) on to object's wave grid
+    # then simply apply sens func to flux
+    print("NOT YET")
     return
 
 #########################
@@ -933,6 +946,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             raw = hdu[0].data
 
         exptime = hdu[0].header['EXPTIME']
+        airmass = hdu[0].header['AIRMASS']
+
         hdu.close(closed=True)
 
         # remove bias and flat

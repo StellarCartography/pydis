@@ -1120,13 +1120,15 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!
         if (len(stdstar) > 0) and (i==0):
-            sensfunc = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
-                                  airmass=airmass)
+            sens_wave, sens_flux = DefFluxCal(wfinal, flux_red_x,
+                                              stdstar=stdstar, airmass=airmass)
         elif (i==0):
-            sensfunc = np.ones_like(flux_red_x)
+            sens_flux = np.ones_like(flux_red_x)
+            sens_wave = wfinal
 
-        # final step in reduction
-        ffinal = flux_red_x * sensfunc
+
+        # final step in reduction, apply sensfunc
+        ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
 
 
         if write_reduced is True:

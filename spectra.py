@@ -650,9 +650,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
                         # find if click is too close to an existing click (overlap)
                         kill = None
                         if len(self.pcent)>0:
-                            print("YES")
                             for k in range(len(self.pcent)):
-                                print(np.abs(self.ixlib[k]-ix), tol)
                                 if np.abs(self.ixlib[k]-ix)<tol:
                                     kill_d = raw_input('> WARNING: Click too close to existing point. To delete existing point, enter "d"')
                                     if kill_d=='d':
@@ -714,9 +712,41 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         pcent = np.array(wavefit.pcent,dtype='float')
         wcent = np.array(wavefit.wcent, dtype='float')
 
+        print('> You have identified '+str(len(pcent))+' lines')
+
         # fit polynomial thru the peak wavelengths
-        coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
-        wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+        # xpix = (np.arange(len(slice))-len(slice)/2)
+        # coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
+        xpix = np.arange(len(slice))
+        coeff = np.polyfit(pcent, wcent, fit_order)
+        wtemp = np.polyval(coeff, xpix)
+
+        done = str(fit_order)
+        while (done != 'd'):
+            fit_order = int(done)
+            coeff = np.polyfit(pcent, wcent, fit_order)
+            wtemp = np.polyval(coeff, xpix)
+
+            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+            ax1.plot(pcent, wcent, 'bo')
+            ax1.plot(xpix, wtemp, 'r')
+
+            ax2.plot(pcent, wcent - np.polyval(coeff, pcent),'ro')
+            ax2.set_xlabel('pixel')
+            ax1.set_ylabel('wavelength')
+            ax2.set_ylabel('residual')
+            ax1.set_title('fit_order = '+str(fit_order))
+
+            # ylabel('wavelength')
+
+            print('> How does this look?  Enter "d" to be done (accept), ')
+            print('  or a number to change the polynomial order and re-fit')
+            print('> Currently fit_order = '+str(fit_order))
+            plt.show()
+
+            done = str(raw_input('d/#: '))
+
+
 
     # = = = = = = = = = = = = = = = = = =
     # now wavelength is found, either via interactive or auto mode!
@@ -1008,12 +1038,13 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file, stdobs='',
     wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
-    if (len(stdobs)>0 and len(stdstar)>0):
-        raw, exptime, stdair = _OpenImg(stdobs, trim=trim)
-
-        stddata = (raw - bias) / flat
-
-        sensfunc = DefFluxCal(stddata, stdstar=stdstar, airmass=stdair)
+    # if the standard star (flux calibration) is defined
+    # if (len(stdobs)>0 and len(stdstar)>0):
+    #     raw, exptime, stdair = _OpenImg(stdobs, trim=trim)
+    #
+    #     stddata = (raw - bias) / flat
+    #
+    #     sensfunc = DefFluxCal(stddata, stdstar=stdstar, airmass=stdair)
 
 
     # read in the list of target spectra

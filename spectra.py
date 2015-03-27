@@ -878,7 +878,26 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(stdobs, stdstar='g191b2b', airmass=1.0):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', airmass=1.0):
+    """
+
+    Parameters
+    ----------
+    obj_wave : 1-d array
+    obj_flux : 1-d array
+    stdstar : str
+        Name of the standard star to use for flux calibration. Currently
+        the IRAF library onedstds/spec50cal is used for flux calibration.
+        Assumes the first star in "speclist" is the standard star. If
+        nothing is entered for "stdstar", no flux calibration will be
+        computed. (Default is '')
+    airmass : float
+
+    Returns
+    -------
+    sensfunc
+
+    """
     stdstar = stdstar.lower()
     # important! need to do calibrate in separate steps for airmass, sensfunc, etc
     # also, need to be able to call it within main routines (from autoreduce)
@@ -889,10 +908,6 @@ def DefFluxCal(stdobs, stdstar='g191b2b', airmass=1.0):
     std_wave0, std_mag, std_wth = np.loadtxt(onedstdpath + stdstar + '.dat',
                                             skiprows=1, unpack=True)
     std_flux0 = _mag2flux(std_mag)
-
-
-    obj_wave, obj_cts = np.loadtxt(dir+'/G191B2B.0020r.fits.spec',skiprows=1,
-                                   unpack=True,delimiter=',')
 
     #-- should we down-sample the template?
     # std_wave = np.arange(np.nanmin(obj_wave), np.nanmax(obj_wave),
@@ -905,24 +920,24 @@ def DefFluxCal(stdobs, stdstar='g191b2b', airmass=1.0):
 
 
     # down-sample (ds) the observed counts
-    obj_cts_ds = []
+    obj_flux_ds = []
     obj_wave_ds = []
     std_flux_ds = []
     for i in range(len(std_wave)):
         rng = np.where((obj_wave>std_wave[i]) &
                        (obj_wave<std_wave[i]+std_wth[i]) )
         if (len(rng[0]) > 1):
-            obj_cts_ds.append(np.sum(obj_cts[rng])/std_wth[i])
+            obj_flux_ds.append(np.sum(obj_flux[rng])/std_wth[i])
             obj_wave_ds.append(std_wave[i])
             std_flux_ds.append(std_flux[i])
 
     plt.figure()
-    plt.plot(obj_wave, obj_cts,'b')
-    plt.plot(obj_wave_ds, obj_cts_ds, 'ro')
+    plt.plot(obj_wave, obj_flux,'b')
+    plt.plot(obj_wave_ds, obj_flux_ds, 'ro')
     plt.xlabel('Wavelength')
     plt.show()
 
-    ratio = np.array(std_flux_ds,dtype='float') / np.array(obj_cts_ds,dtype='float')
+    ratio = np.array(std_flux_ds,dtype='float') / np.array(obj_flux_ds,dtype='float')
 
     ratio_spl = UnivariateSpline(obj_wave_ds, ratio, ext=0, k=3 ,s=0)
 
@@ -942,9 +957,9 @@ def DefFluxCal(stdobs, stdstar='g191b2b', airmass=1.0):
 
     plt.figure()
     plt.plot(std_wave0, std_flux0,'ko')
-    plt.plot(obj_wave, obj_cts/dw * sens,'r',alpha=0.5)
-    # plt.plot(obj_wave, obj_cts/dw * sens2,'g')
-    # plt.plot(obj_wave, obj_cts/dw * sens3,'b')
+    plt.plot(obj_wave, obj_flux/dw * sens,'r',alpha=0.5)
+    # plt.plot(obj_wave, obj_flux/dw * sens2,'g')
+    # plt.plot(obj_wave, obj_flux/dw * sens3,'b')
     plt.title(stdstar)
     plt.xlabel('Wavelength')
     plt.ylabel('Flux (erg/s/cm2/A)')
@@ -961,7 +976,7 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, cal_flux):
     return
 
 #########################
-def autoreduce(speclist, flatlist, biaslist, HeNeAr_file, stdobs='',
+def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=25,
                apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
@@ -987,6 +1002,12 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file, stdobs='',
         Path to file containing list of bias images.
     HeNeAr_file : str
         Path to the HeNeAr calibration image
+    stdstar : str
+        Name of the standard star to use for flux calibration. Currently
+        the IRAF library onedstds/spec50cal is used for flux calibration.
+        Assumes the first star in "speclist" is the standard star. If
+        nothing is entered for "stdstar", no flux calibration will be
+        computed. (Default is '')
     trace1 : bool, optional
         use trace1=True if only perform aperture trace on first object in
         speclist. Useful if e.g. science targets are faint, and first
@@ -1038,14 +1059,6 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file, stdobs='',
     wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
-    # if the standard star (flux calibration) is defined
-    # if (len(stdobs)>0 and len(stdstar)>0):
-    #     raw, exptime, stdair = _OpenImg(stdobs, trim=trim)
-    #
-    #     stddata = (raw - bias) / flat
-    #
-    #     sensfunc = DefFluxCal(stddata, stdstar=stdstar, airmass=stdair)
-
 
     # read in the list of target spectra
     specfile = np.loadtxt(speclist,dtype='string')
@@ -1095,7 +1108,27 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file, stdobs='',
 
         wfinal = mapwavelength(trace, wfit)
 
-        ffinal = (ext_spec - sky) / exptime
+        # subtract local sky level, divide by exptime to get flux units
+        #     (counts / sec)
+        flux_red = (ext_spec - sky) / exptime
+
+        # now get extinction correction
+        extcor = AirmassCor(wfinal, flux_red, airmass)
+        # and apply it...
+        flux_red_x = flux_red * extcor
+
+        # now get flux std IF stdstar is defined
+        # !! assume first object in list is std star !!
+        if (len(stdstar) > 0) and (i==0):
+            sensfunc = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+                                  airmass=airmass)
+        elif (i==0):
+            sensfunc = np.ones_like(flux_red_x)
+
+        # final step in reduction
+        ffinal = flux_red_x * sensfunc
+
+
         if write_reduced is True:
             # write file with the trace (y positions)
             tout = open(spec+'.trace','w')

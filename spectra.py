@@ -973,12 +973,26 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', airmass=1.0):
     return np.array(obj_wave_ds,dtype='float'), ratio
 
 
-def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
+def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc,
+                 mode='linear', polydeg=5):
     # interp calibration (sensfunc) on to object's wave grid
+    # can use 3 types of interpolations: linear, cubic spline, polynomial
     # use linear interpolation for simplest answer
-    sensfunc2 = np.interp(obj_wave, cal_wave, sensfunc)
 
-    # then simply apply sensfunc to target flux
+    if (mode != 'linear') and (mode != 'cubic') and (mode != 'poly'):
+        mode = 'linear'
+
+    # interpolate on to observed wavelength grid
+    if mode=='linear':
+        sensfunc2 = np.interp(obj_wave, cal_wave, sensfunc)
+    elif mode=='cubic':
+        spl = UnivariateSpline(cal_wave, sensfunc, ext=0, k=3 ,s=0)
+        sensfunc2 = spl(obj_wave)
+    elif mode=='poly':
+        fit = np.polyfit(cal_wave, sensfunc, polydeg)
+        sensfunc2 = np.polyval(fit, obj_wave)
+
+    # then simply apply re-sampled sensfunc to target flux
     return obj_flux * sensfunc2
 
 #########################

@@ -898,82 +898,88 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', airmass=1.0):
     sensfunc
 
     """
-    stdstar = stdstar.lower()
-    # important! need to do calibrate in separate steps for airmass, sensfunc, etc
-    # also, need to be able to call it within main routines (from autoreduce)
+    stdstar2 = stdstar.lower()
+    dir = os.path.dirname(os.path.realpath(__file__)) + \
+          '/resources/onedstds/spec50cal/'
 
-    dir = os.path.dirname(os.path.realpath(__file__))
-    onedstdpath = dir + '/resources/onedstds/spec50cal/'
-
-    std_wave0, std_mag, std_wth = np.loadtxt(onedstdpath + stdstar + '.dat',
+    std_wave0, std_mag, std_wth = np.loadtxt(dir + stdstar2 + '.dat',
                                             skiprows=1, unpack=True)
+    # standard star spectrum is stored in magnitude units
     std_flux0 = _mag2flux(std_mag)
 
     #-- should we down-sample the template?
     # std_wave = np.arange(np.nanmin(obj_wave), np.nanmax(obj_wave),
     #                      np.mean(np.abs(std_wave0[1:]-std_wave0[:-1])))
     # std_flux = np.interp(std_wave, std_wave0, std_flux0)
-
-    #-- don't down-sample the template
+    #-- or don't down-sample the template...
     std_wave = std_wave0
     std_flux = std_flux0
 
+    # maybe i'll automatically exclude these lines...
+    balmer = np.array([6563, 4861, 4341],dtype='float')
 
-    # down-sample (ds) the observed counts
+    # down-sample (ds) the observed flux to the standard's bins
     obj_flux_ds = []
     obj_wave_ds = []
     std_flux_ds = []
     for i in range(len(std_wave)):
         rng = np.where((obj_wave>std_wave[i]) &
                        (obj_wave<std_wave[i]+std_wth[i]) )
-        if (len(rng[0]) > 1):
+        IsH = np.where((balmer>std_wave[i]) &
+                       (balmer<std_wave[i]+std_wth[i]) )
+        # does this bin contain observed spectra, and no Balmer line?
+        if (len(rng[0]) > 1) and (len(IsH[0]) == 0):
             obj_flux_ds.append(np.sum(obj_flux[rng])/std_wth[i])
             obj_wave_ds.append(std_wave[i])
             std_flux_ds.append(std_flux[i])
 
-    plt.figure()
-    plt.plot(obj_wave, obj_flux,'b')
-    plt.plot(obj_wave_ds, obj_flux_ds, 'ro')
-    plt.xlabel('Wavelength')
-    plt.show()
+    # plt.figure()
+    # plt.plot(obj_wave, obj_flux,'b')
+    # plt.plot(obj_wave_ds, obj_flux_ds, 'ro')
+    # plt.xlabel('Wavelength')
+    # plt.show()
 
+    # the ratio between the standard star flux and observed flux
+    # has units like erg / counts
     ratio = np.array(std_flux_ds,dtype='float') / np.array(obj_flux_ds,dtype='float')
 
-    ratio_spl = UnivariateSpline(obj_wave_ds, ratio, ext=0, k=3 ,s=0)
+    #-- interpolate ratio on to observed wavelength
+    # ratio_spl = UnivariateSpline(obj_wave_ds, ratio, ext=0, k=3 ,s=0)
 
-    # the width of each pixel (in angstroms)
-    dw_tmp = obj_wave[1:]-obj_wave[:-1]
-    dw = np.abs(np.append(dw_tmp, dw_tmp[-1]))
+    #-- the width of each pixel (in angstroms)
+    # dw_tmp = obj_wave[1:]-obj_wave[:-1]
+    # dw = np.abs(np.append(dw_tmp, dw_tmp[-1]))
 
-    plt.figure()
-    plt.plot(obj_wave_ds, ratio, 'ko')
-    plt.plot(obj_wave, ratio_spl(obj_wave),'r')
-    plt.ylabel('(erg/s/cm2/A) / (counts/s)')
-    plt.show()
+    # plt.figure()
+    # plt.plot(obj_wave_ds, ratio, 'ko')
+    # plt.plot(obj_wave, ratio_spl(obj_wave),'r')
+    # plt.ylabel('(erg/s/cm2/A) / (counts/s)')
+    # plt.show()
 
-    # this still isnt quite the sensfunc we want...
-    sens = ratio_spl(obj_wave)
-
-
-    plt.figure()
-    plt.plot(std_wave0, std_flux0,'ko')
-    plt.plot(obj_wave, obj_flux/dw * sens,'r',alpha=0.5)
-    # plt.plot(obj_wave, obj_flux/dw * sens2,'g')
-    # plt.plot(obj_wave, obj_flux/dw * sens3,'b')
-    plt.title(stdstar)
-    plt.xlabel('Wavelength')
-    plt.ylabel('Flux (erg/s/cm2/A)')
-    plt.show()
+    #xx this still isnt quite the sensfunc we want...
+    # sens = ratio_spl(obj_wave)
 
 
-    return
+    # plt.figure()
+    # plt.plot(std_wave0, std_flux0,'ko')
+    # plt.plot(obj_wave, obj_flux/dw * sens,'r',alpha=0.5)
+    # # plt.plot(obj_wave, obj_flux/dw * sens2,'g')
+    # # plt.plot(obj_wave, obj_flux/dw * sens3,'b')
+    # plt.title(stdstar)
+    # plt.xlabel('Wavelength')
+    # plt.ylabel('Flux (erg/s/cm2/A)')
+    # plt.show()
+
+    return np.array(obj_wave_ds,dtype='float'), ratio
 
 
-def ApplyFluxCal(obj_wave, obj_flux, cal_wave, cal_flux):
+def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
     # interp calibration (sensfunc) on to object's wave grid
-    # then simply apply sens func to flux
-    print("NOT YET")
-    return
+    # use linear interpolation for simplest answer
+    sensfunc2 = np.interp(obj_wave, cal_wave, sensfunc)
+
+    # then simply apply sensfunc to target flux
+    return obj_flux * sensfunc2
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,

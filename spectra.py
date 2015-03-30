@@ -960,7 +960,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='linear', polydeg=5):
         mode = 'linear'
 
     # actually fit the log of this sensfunc ratio
-    # since IRAF does the 2.5*log(ratio)
+    # since IRAF does the 2.5*log(ratio), everything in mag units!
     LogSensfunc = np.log10(ratio)
 
     # interpolate back on to observed wavelength grid
@@ -989,6 +989,7 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=25,
                apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
+               HeNeAr_prev = False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
     """
@@ -1065,8 +1066,12 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     bias = biascombine(biaslist, trim=trim)
     flat,fmask_out = flatcombine(flatlist, bias, trim=trim)
 
+    if HeNeAr_prev is False:
+        prev = ''
+    else:
+        prev = HeNeAr_file+'.lines'
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
+    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac, prev=prev,
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
 

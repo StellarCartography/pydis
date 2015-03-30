@@ -1193,3 +1193,27 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     return
 
+
+def CoAdd(frames, mode='mean'):
+    # co-add FINSIHED, reduced spectra
+    # only trick: resample on to wavelength grid of 1st frame
+    files = np.loadtxt(frames,dtype='string')
+
+    wave_0, flux_0 = np.loadtxt(files[0],dtype='float')
+
+    for i in range(1,len(files)):
+        wave_i, flux_i = np.loadtxt(files[i],dtype='float')
+
+        # linear interp on to wavelength grid of 1st frame
+        flux_i0 = np.interp(wave_0, wave_i, flux_i)
+
+        flux_0 = np.dstack( (flux_0, flux_i0))
+
+    if mode == 'mean':
+        flux_out = flux_0.sum(axis=1) / len(files)
+
+    plt.figure()
+    plt.plot(wave_0, flux_out)
+    plt.show()
+
+    return wave_0, flux_out

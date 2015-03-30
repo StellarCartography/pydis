@@ -416,7 +416,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
-               tol=10, fit_order=2):
+               tol=10, fit_order=2, previous=''):
     """
     Determine the wavelength solution to be used for the science images.
     Can be done either automatically (buyer beware) or manually. Both the
@@ -456,6 +456,9 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
     fit_order : int, optional
         The polynomial order to use to interpolate between identified
         peaks in the HeNeAr (Default is 2)
+    previous : string, optional
+        name of file containing previously identified peaks. Still has to
+        do the fitting.
 
     Returns
     -------
@@ -492,7 +495,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
     ######   IDENTIFY   (auto and interac modes)
-    if interac is False:
+    if (interac is False) and (len(previous)==0):
         print("Doing automatic wavelength calibration on HeNeAr.")
         print("Note, this is not very robust. Suggest you re-run with interac=True")
         # find the linelist of choice
@@ -597,122 +600,132 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
 
 
     # = = = = = = = = = = = = = = = =
-    elif interac is True:
+    elif (interac is True):
+        if (len(previous)==0):
+            print('')
+            print('Using INTERACTIVE HeNeAr_fit mode:')
+            print('1) Click on HeNeAr lines in plot window')
+            print('2) Enter corresponding wavelength in terminal and press <return>')
+            print('   If mis-click or unsure, just press leave blank and press <return>')
+            print('3) To delete an entry, click on label, enter "d" in terminal, press <return>')
+            print('4) Close plot window when finished')
 
-        print('')
-        print('Using INTERACTIVE HeNeAr_fit mode:')
-        print('1) Click on HeNeAr lines in plot window')
-        print('2) Enter corresponding wavelength in terminal and press <return>')
-        print('   If mis-click or unsure, just press leave blank and press <return>')
-        print('3) To delete an entry, click on label, enter "d" in terminal, press <return>')
-        print('4) Close plot window when finished')
+            xraw = np.arange(len(slice))
+            class InteracWave:
+                # http://stackoverflow.com/questions/21688420/callbacks-for-graphical-mouse-input-how-to-refresh-graphics-how-to-tell-matpl
+                def __init__(self):
+                    self.fig = plt.figure()
+                    self.ax = self.fig.add_subplot(111)
+                    self.ax.plot(wtemp, slice, 'b')
+                    plt.xlabel('Wavelength')
+                    plt.ylabel('Counts')
 
-        xraw = np.arange(len(slice))
-        class InteracWave:
-            # http://stackoverflow.com/questions/21688420/callbacks-for-graphical-mouse-input-how-to-refresh-graphics-how-to-tell-matpl
-            def __init__(self):
-                self.fig = plt.figure()
-                self.ax = self.fig.add_subplot(111)
-                self.ax.plot(wtemp, slice, 'b')
-                plt.xlabel('Wavelength')
-                plt.ylabel('Counts')
+                    self.pcent = [] # the pixel centers of the identified lines
+                    self.wcent = [] # the labeled wavelengths of the lines
+                    self.ixlib = [] # library of click points
 
-                self.pcent = [] # the pixel centers of the identified lines
-                self.wcent = [] # the labeled wavelengths of the lines
-                self.ixlib = [] # library of click points
-
-                self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
-                                     color='red', linewidth=1 )
-                self.connect = self.fig.canvas.mpl_connect
-                self.disconnect = self.fig.canvas.mpl_disconnect
-                self.clickCid = self.connect("button_press_event",self.OnClick)
-
-            def OnClick(self, event):
-                # only do stuff if toolbar not being used
-                # NOTE: this subject to change API, so if breaks, this probably why
-                # http://stackoverflow.com/questions/20711148/ignore-matplotlib-cursor-widget-when-toolbar-widget-selected
-                if self.fig.canvas.manager.toolbar._active is None:
-                    ix = event.xdata
-
-                    # if the click is in good space, proceed
-                    if (ix is not None) and (ix > np.nanmin(slice)) and (ix < np.nanmax(slice)):
-                        # disable button event connection
-                        self.disconnect(self.clickCid)
-
-                        # disconnect cursor, and remove from plot
-                        self.cursor.disconnect_events()
-                        self.cursor._update()
-
-                        # get points nearby to the click
-                        nearby = np.where((wtemp > ix-10*disp_approx) &
-                                          (wtemp < ix+10*disp_approx) )
-
-                        # find if click is too close to an existing click (overlap)
-                        kill = None
-                        if len(self.pcent)>0:
-                            for k in range(len(self.pcent)):
-                                if np.abs(self.ixlib[k]-ix)<tol:
-                                    kill_d = raw_input('> WARNING: Click too close to existing point. To delete existing point, enter "d"')
-                                    if kill_d=='d':
-                                        kill = k
-                            if kill is not None:
-                                del(self.pcent[kill])
-                                del(self.wcent[kill])
-                                del(self.ixlib[kill])
-
-
-                        # If there are enough valid points to possibly fit a peak too...
-                        if (len(nearby[0]) > 4) and (kill is None):
-                            imax = np.nanargmax(slice[nearby])
-
-                            pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
-                            try:
-                                popt,pcov = curve_fit(_gaus, xraw[nearby], slice[nearby], p0=pguess)
-                                self.ax.plot(wtemp[int(popt[2])], popt[0], 'r|')
-                            except ValueError:
-                                print('> WARNING: Bad data near this click, cannot centroid line with Gaussian. I suggest you skip this one')
-                                popt = pguess
-                            except RuntimeError:
-                                print('> WARNING: Gaussian centroid on line could not converge. I suggest you skip this one')
-                                popt = pguess
-
-                            # using raw_input sucks b/c doesn't raise terminal, but works for now
-                            try:
-                                number=float(raw_input('> Enter Wavelength: '))
-                                self.pcent.append(popt[2])
-                                self.wcent.append(number)
-                                self.ixlib.append((ix))
-                                self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
-                                print('  Saving '+str(number))
-                            except ValueError:
-                                print "> Warning: Not a valid wavelength float!"
-
-                        elif (kill is None):
-                            print('> Error: No valid data near click!')
-
-                        # reconnect to cursor and button event
-                        self.clickCid = self.connect("button_press_event",self.OnClick)
-                        self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
+                    self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
                                          color='red', linewidth=1 )
-                else:
-                    pass
+                    self.connect = self.fig.canvas.mpl_connect
+                    self.disconnect = self.fig.canvas.mpl_disconnect
+                    self.clickCid = self.connect("button_press_event",self.OnClick)
 
-        # run the interactive program
-        wavefit = InteracWave()
-        plt.show() #activate the display - GO!
+                def OnClick(self, event):
+                    # only do stuff if toolbar not being used
+                    # NOTE: this subject to change API, so if breaks, this probably why
+                    # http://stackoverflow.com/questions/20711148/ignore-matplotlib-cursor-widget-when-toolbar-widget-selected
+                    if self.fig.canvas.manager.toolbar._active is None:
+                        ix = event.xdata
 
-        # how I would LIKE to do this interactively:
-        # inside the interac mode, do a split panel, live-updated with
-        # the wavelength solution, and where user can edit the fit_order
+                        # if the click is in good space, proceed
+                        if (ix is not None) and (ix > np.nanmin(slice)) and (ix < np.nanmax(slice)):
+                            # disable button event connection
+                            self.disconnect(self.clickCid)
 
-        # how I WILL do it instead
-        # a crude while loop here, just to get things moving
+                            # disconnect cursor, and remove from plot
+                            self.cursor.disconnect_events()
+                            self.cursor._update()
 
-        # after interactive fitting done, get results fit peaks
-        pcent = np.array(wavefit.pcent,dtype='float')
-        wcent = np.array(wavefit.wcent, dtype='float')
+                            # get points nearby to the click
+                            nearby = np.where((wtemp > ix-10*disp_approx) &
+                                              (wtemp < ix+10*disp_approx) )
 
-        print('> You have identified '+str(len(pcent))+' lines')
+                            # find if click is too close to an existing click (overlap)
+                            kill = None
+                            if len(self.pcent)>0:
+                                for k in range(len(self.pcent)):
+                                    if np.abs(self.ixlib[k]-ix)<tol:
+                                        kill_d = raw_input('> WARNING: Click too close to existing point. To delete existing point, enter "d"')
+                                        if kill_d=='d':
+                                            kill = k
+                                if kill is not None:
+                                    del(self.pcent[kill])
+                                    del(self.wcent[kill])
+                                    del(self.ixlib[kill])
+
+
+                            # If there are enough valid points to possibly fit a peak too...
+                            if (len(nearby[0]) > 4) and (kill is None):
+                                imax = np.nanargmax(slice[nearby])
+
+                                pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
+                                try:
+                                    popt,pcov = curve_fit(_gaus, xraw[nearby], slice[nearby], p0=pguess)
+                                    self.ax.plot(wtemp[int(popt[2])], popt[0], 'r|')
+                                except ValueError:
+                                    print('> WARNING: Bad data near this click, cannot centroid line with Gaussian. I suggest you skip this one')
+                                    popt = pguess
+                                except RuntimeError:
+                                    print('> WARNING: Gaussian centroid on line could not converge. I suggest you skip this one')
+                                    popt = pguess
+
+                                # using raw_input sucks b/c doesn't raise terminal, but works for now
+                                try:
+                                    number=float(raw_input('> Enter Wavelength: '))
+                                    self.pcent.append(popt[2])
+                                    self.wcent.append(number)
+                                    self.ixlib.append((ix))
+                                    self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
+                                    print('  Saving '+str(number))
+                                except ValueError:
+                                    print "> Warning: Not a valid wavelength float!"
+
+                            elif (kill is None):
+                                print('> Error: No valid data near click!')
+
+                            # reconnect to cursor and button event
+                            self.clickCid = self.connect("button_press_event",self.OnClick)
+                            self.cursor = Cursor(self.ax, useblit=False,horizOn=False,
+                                             color='red', linewidth=1 )
+                    else:
+                        pass
+
+            # run the interactive program
+            wavefit = InteracWave()
+            plt.show() #activate the display - GO!
+
+            # how I would LIKE to do this interactively:
+            # inside the interac mode, do a split panel, live-updated with
+            # the wavelength solution, and where user can edit the fit_order
+
+            # how I WILL do it instead
+            # a crude while loop here, just to get things moving
+
+            # after interactive fitting done, get results fit peaks
+            pcent = np.array(wavefit.pcent,dtype='float')
+            wcent = np.array(wavefit.wcent, dtype='float')
+
+            print('> You have identified '+str(len(pcent))+' lines')
+            lout = open(calimage+'.lines', 'w')
+            lout.write("# This file contains the HeNeAr lines manually identified. Columns: (pixel, wavelength) \n")
+            for l in range(len(pcent)):
+                lout.write(str(pcent[l]) + ', ' + str(wcent[l])+'\n')
+            lout.close
+
+
+        if (len(previous)>0):
+            pcent, wcent = np.loadtxt(previous, dtype='float',
+                                      unpack=True, skiprows=1,delimiter=',')
 
         # fit polynomial thru the peak wavelengths
         # xpix = (np.arange(len(slice))-len(slice)/2)
@@ -745,7 +758,6 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
             plt.show()
 
             done = str(raw_input('d/#: '))
-
 
 
     # = = = = = = = = = = = = = = = = = =
@@ -878,7 +890,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', airmass=1.0):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='linear', polydeg=5):
     """
 
     Parameters
@@ -933,48 +945,13 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', airmass=1.0):
             obj_wave_ds.append(std_wave[i])
             std_flux_ds.append(std_flux[i])
 
-    # plt.figure()
-    # plt.plot(obj_wave, obj_flux,'b')
-    # plt.plot(obj_wave_ds, obj_flux_ds, 'ro')
-    # plt.xlabel('Wavelength')
-    # plt.show()
 
     # the ratio between the standard star flux and observed flux
     # has units like erg / counts
-    ratio = np.array(std_flux_ds,dtype='float') / np.array(obj_flux_ds,dtype='float')
-
-    #-- interpolate ratio on to observed wavelength
-    # ratio_spl = UnivariateSpline(obj_wave_ds, ratio, ext=0, k=3 ,s=0)
-
-    #-- the width of each pixel (in angstroms)
-    # dw_tmp = obj_wave[1:]-obj_wave[:-1]
-    # dw = np.abs(np.append(dw_tmp, dw_tmp[-1]))
-
-    # plt.figure()
-    # plt.plot(obj_wave_ds, ratio, 'ko')
-    # plt.plot(obj_wave, ratio_spl(obj_wave),'r')
-    # plt.ylabel('(erg/s/cm2/A) / (counts/s)')
-    # plt.show()
-
-    #xx this still isnt quite the sensfunc we want...
-    # sens = ratio_spl(obj_wave)
+    ratio = np.abs(np.array(std_flux_ds,dtype='float') /
+                   np.array(obj_flux_ds,dtype='float'))
 
 
-    # plt.figure()
-    # plt.plot(std_wave0, std_flux0,'ko')
-    # plt.plot(obj_wave, obj_flux/dw * sens,'r',alpha=0.5)
-    # # plt.plot(obj_wave, obj_flux/dw * sens2,'g')
-    # # plt.plot(obj_wave, obj_flux/dw * sens3,'b')
-    # plt.title(stdstar)
-    # plt.xlabel('Wavelength')
-    # plt.ylabel('Flux (erg/s/cm2/A)')
-    # plt.show()
-
-    return np.array(obj_wave_ds,dtype='float'), ratio
-
-
-def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc,
-                 mode='linear', polydeg=5):
     # interp calibration (sensfunc) on to object's wave grid
     # can use 3 types of interpolations: linear, cubic spline, polynomial
     # use linear interpolation for simplest answer
@@ -982,18 +959,31 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc,
     if (mode != 'linear') and (mode != 'cubic') and (mode != 'poly'):
         mode = 'linear'
 
-    # interpolate on to observed wavelength grid
+    # actually fit the log of this sensfunc ratio
+    # since IRAF does the 2.5*log(ratio)
+    LogSensfunc = np.log10(ratio)
+
+    # interpolate back on to observed wavelength grid
     if mode=='linear':
-        sensfunc2 = np.interp(obj_wave, cal_wave, sensfunc)
+        sensfunc2 = np.interp(obj_wave, obj_wave_ds, LogSensfunc)
     elif mode=='cubic':
-        spl = UnivariateSpline(cal_wave, sensfunc, ext=0, k=3 ,s=0)
+        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=3 ,s=0)
         sensfunc2 = spl(obj_wave)
     elif mode=='poly':
-        fit = np.polyfit(cal_wave, sensfunc, polydeg)
+        fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
         sensfunc2 = np.polyval(fit, obj_wave)
+
+    return sensfunc2
+
+
+def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
+    # the sensfunc should already be BASICALLY at the same wavelenths as the targets
+    # BUT, just in case, we linearly resample it:
+    sensfunc2 = np.interp(obj_wave, cal_wave, sensfunc)
 
     # then simply apply re-sampled sensfunc to target flux
     return obj_flux * sensfunc2
+
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
@@ -1140,9 +1130,11 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!
         if (len(stdstar) > 0) and (i==0):
-            sens_wave, sens_flux = DefFluxCal(wfinal, flux_red_x,
-                                              stdstar=stdstar, airmass=airmass)
+            sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar, mode='cubic')
+            sens_wave = wfinal
+
         elif (i==0):
+            # if 1st obj not the std, then just make array of 1's to multiply thru
             sens_flux = np.ones_like(flux_red_x)
             sens_wave = wfinal
 

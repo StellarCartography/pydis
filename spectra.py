@@ -120,7 +120,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
     return bias
 
 
-def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
+def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
                 display=False, flat_poly=5, response=True):
     """
     Combine the flat frames in to a master flat image. Subtracts the
@@ -197,10 +197,15 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True,
         # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
         flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
 
-        # fit log flux with polynomial
-        flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
-        # get rid of log
-        flat_curve = 10.0**np.polyval(flat_fit, xdata)
+        if mode=='spline':
+            spl = UnivariateSpline(xdata, flat_1d, ext=0, k=3 ,s=0.01)
+            flat_curve = 10.0**spl(xdata)
+        elif mode=='poly':
+            # fit log flux with polynomial
+            flat_fit = np.polyfit(xdata, flat_1d, flat_poly)
+            # get rid of log
+            flat_curve = 10.0**np.polyval(flat_fit, xdata)
+
 
         if display is True:
             plt.figure()
@@ -890,7 +895,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
     """
 
     Parameters
@@ -903,7 +908,8 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
         Assumes the first star in "speclist" is the standard star. If
         nothing is entered for "stdstar", no flux calibration will be
         computed. (Default is '')
-    airmass : float
+    mode : str, optional
+        either "linear", "spline", or "poly" (Default is spline)
 
     Returns
     -------
@@ -937,8 +943,10 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
     for i in range(len(std_wave)):
         rng = np.where((obj_wave>std_wave[i]) &
                        (obj_wave<std_wave[i]+std_wth[i]) )
+
         IsH = np.where((balmer>std_wave[i]) &
                        (balmer<std_wave[i]+std_wth[i]) )
+
         # does this bin contain observed spectra, and no Balmer line?
         if (len(rng[0]) > 1) and (len(IsH[0]) == 0):
             obj_flux_ds.append(np.sum(obj_flux[rng])/std_wth[i])
@@ -951,12 +959,15 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
     ratio = np.abs(np.array(std_flux_ds,dtype='float') /
                    np.array(obj_flux_ds,dtype='float'))
 
+    obj_wave_std = np.abs(obj_wave[1:]-obj_wave[:-1])
+    obj_wave_std = np.append(obj_wave_std, obj_wave_std[-1])
+
 
     # interp calibration (sensfunc) on to object's wave grid
     # can use 3 types of interpolations: linear, cubic spline, polynomial
     # use linear interpolation for simplest answer
 
-    if (mode != 'linear') and (mode != 'cubic') and (mode != 'poly'):
+    if (mode != 'linear') and (mode != 'spline') and (mode != 'poly'):
         mode = 'linear'
 
     # actually fit the log of this sensfunc ratio
@@ -966,12 +977,27 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
     # interpolate back on to observed wavelength grid
     if mode=='linear':
         sensfunc2 = np.interp(obj_wave, obj_wave_ds, LogSensfunc)
-    elif mode=='cubic':
-        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=3 ,s=0)
+    elif mode=='spline':
+        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.01)
         sensfunc2 = spl(obj_wave)
     elif mode=='poly':
         fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
         sensfunc2 = np.polyval(fit, obj_wave)
+
+    # plt.figure()
+    # plt.plot(obj_wave, obj_flux/obj_wave_std,'k')
+    # plt.plot(obj_wave_ds, obj_flux_ds,'bo')
+    # plt.show()
+    #
+    # plt.figure()
+    # plt.plot(obj_wave_ds, LogSensfunc,'ko')
+    # plt.plot(obj_wave, sensfunc2)
+    # plt.show()
+    #
+    # plt.figure()
+    # plt.plot(obj_wave, obj_flux/obj_wave_std*(10**sensfunc2),'k')
+    # plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
+    # plt.show()
 
     return 10**sensfunc2
 
@@ -979,7 +1005,11 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
 def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
     # the sensfunc should already be BASICALLY at the same wavelenths as the targets
     # BUT, just in case, we linearly resample it:
-    sensfunc2 = np.interp(obj_wave, cal_wave, sensfunc)
+
+    # ensure input array is sorted!
+    ss = np.argsort(cal_wave)
+
+    sensfunc2 = np.interp(obj_wave, cal_wave[ss], sensfunc[ss])
 
     # then simply apply re-sampled sensfunc to target flux
     return obj_flux * sensfunc2
@@ -988,7 +1018,7 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=25,
-               flat_order=9, flat_response=True,
+               flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=3,skysep=25,skywidth=75,
                HeNeAr_prev=False, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
@@ -1065,7 +1095,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim=trim)
-    flat,fmask_out = flatcombine(flatlist, bias, trim=trim,
+    flat,fmask_out = flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=True,
                                  flat_poly=flat_order, response=flat_response)
 
     if HeNeAr_prev is False:
@@ -1137,7 +1167,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!
         if (len(stdstar) > 0) and (i==0):
-            sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar, mode='cubic')
+            sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+                                   mode='spline',polydeg=12)
             sens_wave = wfinal
 
         elif (i==0):
@@ -1147,7 +1178,12 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
 
         # final step in reduction, apply sensfunc
-        ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
+        ffinal = ApplyFluxCal(wfinal, flux_red_x,
+                              sens_wave, sens_flux)
+
+        # the width of each pixel in wavelength units
+        wave_std = np.abs(wfinal[1:]-wfinal[:-1])
+        wave_std = np.append(wave_std, wave_std[-1])
 
 
         if write_reduced is True:
@@ -1199,23 +1235,26 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 def CoAdd(frames, mode='mean'):
     # co-add FINSIHED, reduced spectra
     # only trick: resample on to wavelength grid of 1st frame
-    files = np.loadtxt(frames,dtype='string')
+    files = np.loadtxt(frames, dtype='string',unpack=True)
 
-    wave_0, flux_0 = np.loadtxt(files[0],dtype='float')
+    # read in first file
+    wave_0, flux_0 = np.loadtxt(files[0],dtype='float',skiprows=1,
+                                unpack=True,delimiter=',')
 
     for i in range(1,len(files)):
-        wave_i, flux_i = np.loadtxt(files[i],dtype='float')
+        wave_i, flux_i = np.loadtxt(files[i],dtype='float',skiprows=1,
+                                    unpack=True,delimiter=',')
 
         # linear interp on to wavelength grid of 1st frame
         flux_i0 = np.interp(wave_0, wave_i, flux_i)
 
         flux_0 = np.dstack( (flux_0, flux_i0))
 
-    if mode == 'mean':
-        flux_out = flux_0.sum(axis=1) / len(files)
+    # if mode == 'mean':
+    flux_out = np.squeeze(flux_0.sum(axis=2) / len(files))
 
-    plt.figure()
-    plt.plot(wave_0, flux_out)
-    plt.show()
+    # plt.figure()
+    # plt.plot(wave_0, flux_out)
+    # plt.show()
 
     return wave_0, flux_out

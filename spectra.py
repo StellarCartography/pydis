@@ -720,7 +720,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
             lout.write("# This file contains the HeNeAr lines manually identified. Columns: (pixel, wavelength) \n")
             for l in range(len(pcent)):
                 lout.write(str(pcent[l]) + ', ' + str(wcent[l])+'\n')
-            lout.close
+            lout.close()
 
 
         if (len(previous)>0):
@@ -890,7 +890,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='linear', polydeg=5):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='cubic', polydeg=5):
     """
 
     Parameters
@@ -973,7 +973,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='linear', polydeg=5):
         fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
         sensfunc2 = np.polyval(fit, obj_wave)
 
-    return sensfunc2
+    return 10**sensfunc2
 
 
 def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
@@ -988,8 +988,9 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=25,
-               apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
-               HeNeAr_prev = False,
+               flat_order=9, flat_response=True,
+               apwidth=3,skysep=25,skywidth=75,
+               HeNeAr_prev=False, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
     """
@@ -1064,14 +1065,15 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim=trim)
-    flat,fmask_out = flatcombine(flatlist, bias, trim=trim)
+    flat,fmask_out = flatcombine(flatlist, bias, trim=trim,
+                                 flat_poly=flat_order, response=flat_response)
 
     if HeNeAr_prev is False:
         prev = ''
     else:
         prev = HeNeAr_file+'.lines'
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac, prev=prev,
+    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,previous=prev,
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
 
@@ -1130,7 +1132,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         # now get extinction correction
         extcor = AirmassCor(wfinal, flux_red, airmass)
         # and apply it...
-        flux_red_x = flux_red * extcor
+        flux_red_x = flux_red #* extcor
 
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!

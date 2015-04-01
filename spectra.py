@@ -125,7 +125,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
 
 
 def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
-                display=False, flat_poly=5, response=True):
+                display=True, flat_poly=5, response=True):
     """
     Combine the flat frames in to a master flat image. Subtracts the
     master bias image first from each flat image. Currently only
@@ -202,7 +202,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
         flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
 
         if mode=='spline':
-            spl = UnivariateSpline(xdata, flat_1d, ext=0, k=3 ,s=0.01)
+            spl = UnivariateSpline(xdata, flat_1d, ext=0, k=2 ,s=0.001)
             flat_curve = 10.0**spl(xdata)
         elif mode=='poly':
             # fit log flux with polynomial
@@ -225,7 +225,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
         flat = flat_stack
 
     # normalize flat
-    flat = flat / np.median(flat[ok,:])
+    flat = flat #/ np.median(flat[ok,:])
 
     if display is True:
         plt.figure()
@@ -425,7 +425,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 def HeNeAr_fit(calimage, linelist='', interac=True,
                trim=True, fmask=(1,), display=True,
-               tol=10, fit_order=2, previous=''):
+               tol=10, fit_order=2, previous='',mode='poly'):
     """
     Determine the wavelength solution to be used for the science images.
     Can be done either automatically (buyer beware) or manually. Both the
@@ -833,18 +833,31 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         plt.scatter(xcent_big,ycent_big,marker='|',c='r')
         plt.show()
 
-    #-- now the big show!
+
     #  fit the wavelength solution for the entire chip w/ a 2d spline
-    xfitd = 3 # the spline dimension in the wavelength space
-    print('Fitting Spline!')
-    wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
-                                 bbox=[0,img.shape[1],0,img.shape[0]] )
+    if mode=='spline2d':
+        xfitd = 5 # the spline dimension in the wavelength space
+        print('Fitting Spline!')
+        wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
+                                     bbox=[0,img.shape[1],0,img.shape[0]],s=0 )
+    #elif mode=='poly2d':
     ## using 2d polyfit
-    # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
+        # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
+
+    elif mode=='poly':
+        print(np.shape(img), img.shape)
+        wfit = np.zeros_like(img)
+        xpix = np.arange(len(slice))
+
+        for i in np.arange(ycent_big.min(), ycent_big.max()):
+            x = np.where((ycent_big==i))
+            coeff = np.polyfit(xcent_big[x], wcent_big[x], fit_order)
+            wfit[i,:] = np.polyval(coeff, xpix)
+
     return wfit
 
 
-def mapwavelength(trace, wavemap):
+def mapwavelength(trace, wavemap, mode='poly'):
     """
     Compute the wavelength along the center of the trace, to be run after
     the HeNeAr_fit routine.
@@ -863,7 +876,12 @@ def mapwavelength(trace, wavemap):
         The wavelength vector evaluated at each position along the trace
     """
     # use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
-    trace_wave = wavemap.ev(np.arange(len(trace)), trace)
+    if mode=='spline2d':
+        trace_wave = wavemap.ev(np.arange(len(trace)), trace)
+    elif mode=='poly':
+        trace_wave = np.zeros_like(trace)
+        for i in range(len(trace)):
+            trace_wave[i] = np.interp(trace[i], range(wavemap.shape[0]), wavemap[:,i])
 
     ## using 2d polyfit
     # trace_wave = polyval2d(np.arange(len(trace)), trace, wavemap)
@@ -899,7 +917,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5, display=True):
     """
 
     Parameters
@@ -983,26 +1001,33 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
     if mode=='linear':
         sensfunc2 = np.interp(obj_wave, obj_wave_ds, LogSensfunc)
     elif mode=='spline':
-        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.01)
+        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.005)
         sensfunc2 = spl(obj_wave)
     elif mode=='poly':
         fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
         sensfunc2 = np.polyval(fit, obj_wave)
 
-    plt.figure()
-    plt.plot(obj_wave, obj_flux,'k')
-    plt.plot(obj_wave_ds, obj_flux_ds,'bo')
-    plt.show()
+    if display is True:
+        plt.figure()
+        plt.plot(obj_wave, obj_flux,'k')
+        plt.plot(obj_wave_ds, obj_flux_ds,'bo')
+        plt.xlabel('Wavelength')
+        plt.ylabel('Observed Counts/S')
+        plt.show()
 
-    plt.figure()
-    plt.plot(obj_wave_ds, LogSensfunc,'ko')
-    plt.plot(obj_wave, sensfunc2)
-    plt.show()
+        plt.figure()
+        plt.plot(obj_wave_ds, LogSensfunc,'ko')
+        plt.plot(obj_wave, sensfunc2)
+        plt.xlabel('Wavelength')
+        plt.ylabel('log Sensfunc')
+        plt.show()
 
-    plt.figure()
-    plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k')
-    plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
-    plt.show()
+        plt.figure()
+        plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k')
+        plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
+        plt.xlabel('Wavelength')
+        plt.ylabel('Standard Star Flux')
+        plt.show()
 
     return 10**sensfunc2
 
@@ -1024,7 +1049,7 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=25,
                flat_mode='spline', flat_order=9, flat_response=True,
-               apwidth=3,skysep=25,skywidth=75,
+               apwidth=3,skysep=25,skywidth=75, skydeg=2,
                HeNeAr_prev=False, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
@@ -1108,7 +1133,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     else:
         prev = HeNeAr_file+'.lines'
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,previous=prev,
+    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
+                      previous=prev,mode='poly',
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
 
@@ -1119,8 +1145,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         spec = specfile[i]
         raw, exptime, airmass = _OpenImg(spec, trim=trim)
 
-        # remove bias and flat
-        data = (raw - bias) / flat
+        # remove bias and flat, divide by exptime
+        data = ((raw - bias) / flat) / exptime
 
         if display is True:
             plt.figure()
@@ -1136,7 +1162,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         ext_spec = ap_extract(data, trace, apwidth=apwidth)
 
         # measure sky values along trace
-        sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,skywidth=skywidth)
+        sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,
+                      skywidth=skywidth,skydeg=skydeg)
 
         xbins = np.arange(data.shape[1])
         if display is True:
@@ -1154,15 +1181,16 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.title('(with trace, aperture, and sky regions)')
             plt.show()
 
-        # write output file for extracted spectrum
-        # if write_reduced is True:
-        #     np.savetxt(spec+'.apextract',ext_spec-sky)
 
-        wfinal = mapwavelength(trace, wfit)
+        wfinal = mapwavelength(trace, wfit, mode='poly')
+
+        # plt.figure()
+        # plt.plot(wfinal,'r')
+        # plt.show()
 
         # subtract local sky level, divide by exptime to get flux units
         #     (counts / sec)
-        flux_red = (ext_spec - sky) / exptime
+        flux_red = (ext_spec - sky)
 
         # now get extinction correction
         extcor = AirmassCor(wfinal, flux_red, airmass)
@@ -1255,8 +1283,10 @@ def CoAdd(frames, mode='mean'):
 
         flux_0 = np.dstack( (flux_0, flux_i0))
 
-    # if mode == 'mean':
-    flux_out = np.squeeze(flux_0.sum(axis=2) / len(files))
+    if mode == 'mean':
+        flux_out = np.squeeze(flux_0.sum(axis=2) / len(files))
+    if mode == 'median':
+        flux_out = np.squeeze(np.median(flux_0, axis=2))
 
     # plt.figure()
     # plt.plot(wave_0, flux_out)

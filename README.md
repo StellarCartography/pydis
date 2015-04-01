@@ -1,8 +1,12 @@
 # *SPECTRA*
-A simple reduction package for one dimensional longslit spectroscopy using Python.
+A simple reduction package for one dimensional longslit spectroscopy using Python. Also colloqiually known as "pyDIS", as it was designed for DIS
+
+The goal of *SPECTRA* is to provide a turn-key solution for reducing and understanding longslit spectroscopy, which could ideally be done in real time. Currently we are using many simple assumptions to get a quick-and-dirty solution, and modeling the workflow after the robust industry standards set by IRAF. Additionally, we have only used data from the low/medium resolution [APO 3.5-m](http://www.apo.nmsu.edu) "Dual Imaging Spectrograph" (DIS). Therefore, many instrument specific assumptions are being made.
+
+
 
 ## Examples
-### Auto-reduce my data!
+#### Auto-reduce my data!
 
 The goal is to make SPECTRA as easy to use while observing as possible. Here is an example of a script you might run over and over throughout the night:
 
@@ -15,26 +19,15 @@ sys.path.append('/path/to/spectra/')
 import spectra
     
 spectra.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
-                 'HeNeAr.0005r.fits', HeNeAr_interac=False)
+                 'HeNeAr.0005r.fits', stdstar='fiege34')
 ````
 
 The `autoreduce` function must be given a list of target objects, a list of flats frames, a list of bias frames, and the path to one HeNeAr calibration frame. In this example, the HeNeAr frame is automatically fit, which usually works reasonably well but should not be trusted for e.g. sub-pixel velocity calibration.
 
-Many keywords are available to customize the `autoreduce` function. Here are the default definitions:
+*Many* keywords are available to customize the `autoreduce` function for most needs.
 
 
-````python
-autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-           trace1=False, ntracesteps=25,
-           apwidth=3,skysep=25,skywidth=75, HeNeAr_interac=False,
-           HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
-           trim=True, write_reduced=True, display=True)
-````
-
-Master flat and bias files (FLAT.fits and BIAS.fits by default), trace files with x,y coordinates (.trace files), and two column wavelength,flux spectra (.spec files), will be written at the end.
-
-
-### Manually reduce stuff
+#### Manually reduce stuff
 You can also use each component of the reduction process. For example, if you wanted to combine all your flat and bias frames:
 
 ````python 
@@ -48,15 +41,8 @@ Note also that `flatcombine` returns both the data array and a 1-d "mask" array,
 
 
 
-
-## About
-
-This is a side project, attempting to create a full Python (IRAF free) reduction and extraction pipeline for low/medium resolution longslit spectra. Currently we are using many simple assumptions to get a quick-and-dirty solution, and modeling the workflow after the robust industry standards set by IRAF.
-
-So far we are only using data from the low/medium resolution [APO 3.5-m](http://www.apo.nmsu.edu) "Dual Imaging Spectrograph" (DIS). Therefore, many instrument specific assumptions are being made.
-
-### Motivation
-Really slick tools exist for on-the-fly photometry analysis. However, no turn-key spectra toolkit for Python (without IRAF or PyRAF) is currently available. Here are some mission statements:
+## Motivation
+Really slick tools exist for on-the-fly photometry analysis. However, no turn-key, easy to use spectra toolkit for Python (without IRAF or PyRAF) was available (that we were aware of). Here are some mission statements:
 
 - Being able to extract and see data in real time at the telescope would be extremely helpful!
 - This pipeline doesn't have to give perfect results to be very useful
@@ -68,13 +54,19 @@ Really slick tools exist for on-the-fly photometry analysis. However, no turn-ke
 	- Wavelength Calibration using HeNeAr arc lamp spectra
 	- Sky Subtraction
 	- Extraction
-- Flux Calibration is a good goal
+	- basic Flux Calibration
 - The more hands-free the better, a full reduction script needs to be available
 - A fully interactive mode (a la IRAF) should be available for each task
 
-So far SPECTRA can do a rough job of all the reduction tasks, except flux calibration, for single point sources objects. We are seeking more data to test it against, to help refine the solution and find bugs. Here is one example of a hands-free reduced M dwarf spectrum versus the manual IRAF reduction (note: pyDIS has become SPECTRA)
+So far SPECTRA can do a rough job of all the reduction tasks for single point sources objects! We are seeking more data to test it against, to help refine the solution and find bugs. Here is one example of a **totally hands-free reduced M dwarf spectrum** versus the manual IRAF reduction:
 
-![Imgur](http://i.imgur.com/IjXdt39l.png)
+![Imgur](http://i.imgur.com/4Y55NZHl.png)
 
-### How to Help
-Check out the Issues page if you think you can help code! Or if you have some data already reduced that you trust and would be willing to share, let us know!
+**This spectrum took a few second to reduce, and is good enough for a quick-look!** There are defintely errors in the wavelength, and small offsets in the flux calibration. A (terrible) brute-force wavelength solution, and sometimes fickle flux calibration are being used here. With some minimal parameter tweaking and manual lamp-line identifications the results are even better!
+
+
+
+## How to Help
+
+- Check out the Issues page if you think you can help code, or want to requst a feature! 
+- If you have some data already reduced in IRAF that you trust and would be willing to share, let us know!

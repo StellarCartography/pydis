@@ -413,12 +413,17 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
                       np.arange(itrace+apwidth+skysep, itrace+apwidth+skysep+skywidth))
 
         z = img[y,i]
-        # fit a polynomial to the sky in this column
-        pfit = np.polyfit(y,z,skydeg)
-        # define the aperture in this column
-        ap = np.arange(trace[i]-apwidth,trace[i]+apwidth)
-        # evaluate the polynomial across the aperture, and sum
-        skysubflux[i] = np.sum(np.polyval(pfit, ap))
+        if (skydeg>0):
+            # fit a polynomial to the sky in this column
+            pfit = np.polyfit(y,z,skydeg)
+            # define the aperture in this column
+            ap = np.arange(trace[i]-apwidth, trace[i]+apwidth)
+            # evaluate the polynomial across the aperture, and sum
+            skysubflux[i] = np.sum(np.polyval(pfit, ap))
+        elif (skydeg==0):
+            skysubflux[i] = np.median(z)*apwidth*2.0
+
+
     return skysubflux
 
 
@@ -845,7 +850,6 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
 
     elif mode=='poly':
-        print(np.shape(img), img.shape)
         wfit = np.zeros_like(img)
         xpix = np.arange(len(slice))
 
@@ -917,7 +921,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5, display=True):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5, display=False):
     """
 
     Parameters
@@ -1211,8 +1215,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
 
         # final step in reduction, apply sensfunc
-        ffinal = ApplyFluxCal(wfinal, flux_red_x,
-                              sens_wave, sens_flux)
+        ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
 
         # the width of each pixel in wavelength units
         # wave_std = np.abs(wfinal[1:]-wfinal[:-1])
@@ -1263,6 +1266,78 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         plt.show()
 
     return
+
+
+
+
+def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
+               stdstar='', trace1=False, ntracesteps=25,
+               flat_mode='spline', flat_order=9, flat_response=True,
+               apwidth=3,skysep=25,skywidth=75, skydeg=2,
+               HeNeAr_prev=False, HeNeAr_interac=False,
+               HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
+               trim=True, write_reduced=True, display=True):
+    """
+    A special version of autoreduce, that assumes all the target images want to be
+    median co-added and then extracted
+
+    """
+    #-- the basic crap, used for all frames
+    bias = biascombine(biaslist, trim=trim)
+    flat,fmask_out = flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
+                                 flat_poly=flat_order, response=flat_response)
+    if HeNeAr_prev is False:
+        prev = ''
+    else:
+        prev = HeNeAr_file+'.lines'
+    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
+                      previous=prev,mode='poly',
+                      display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
+
+    #-- the standard star, set the stage
+    specfile = np.loadtxt(speclist,dtype='string')
+    spec = specfile[0]
+    raw, exptime, airmass = _OpenImg(spec, trim=trim)
+    data = ((raw - bias) / flat) / exptime
+    trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
+    ext_spec = ap_extract(data, trace, apwidth=apwidth)
+    sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,
+                  skywidth=skywidth,skydeg=skydeg)
+    xbins = np.arange(data.shape[1])
+    wfinal = mapwavelength(trace, wfit, mode='poly')
+    flux_red_x = (ext_spec - sky)
+    sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+                           mode='spline',polydeg=12)
+    sens_wave = wfinal
+    ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
+
+    #-- the target star exposures, stack and proceed
+    for i in range(1,len(specfile)):
+        spec = specfile[i]
+        raw, exptime, airmass = _OpenImg(spec, trim=trim)
+        data_i = ((raw - bias) / flat) / exptime
+        if (i==1):
+            all_data = data_i
+        elif (i>1):
+            all_data = np.dstack( (all_data, data_i))
+    data = np.median(all_data, axis=2)
+    ext_spec = ap_extract(data, trace, apwidth=apwidth)
+    sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,
+                  skywidth=skywidth,skydeg=skydeg)
+    xbins = np.arange(data.shape[1])
+    wfinal = mapwavelength(trace, wfit, mode='poly')
+    flux_red_x = (ext_spec - sky)
+    ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
+
+    plt.figure()
+    plt.plot(wfinal, ffinal)
+    plt.title("CO-ADD DONE")
+    plt.ylim( (np.percentile(ffinal,5),
+                   np.percentile(ffinal,95)) )
+    plt.show()
+
+    return wfinal, ffinal
+
 
 
 def CoAdd(frames, mode='mean'):

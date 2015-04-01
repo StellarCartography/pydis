@@ -29,9 +29,13 @@ from matplotlib.widgets import Cursor
 
 
 
-def _mag2flux(mag, zeropt=21.10):
+def _mag2flux(wave, mag, zeropt=48.60):
+    # NOTE: onedstds are stored in AB_mag units,
+    # so use AB_mag zeropt by default. Convert to
+    # PHOTFLAM units for flux!
+    c = 2.99792458e18 # speed of light, in A/s
     flux = 10.0**( (mag + zeropt) / (-2.5) )
-    return flux
+    return flux * (c / wave**2.0)
 
 def _gaus(x,a,b,x0,sigma):
     """ Simple Gaussian function, for internal use only """
@@ -923,7 +927,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
     std_wave0, std_mag, std_wth = np.loadtxt(dir + stdstar2 + '.dat',
                                             skiprows=1, unpack=True)
     # standard star spectrum is stored in magnitude units
-    std_flux0 = _mag2flux(std_mag)
+    std_flux0 = _mag2flux(std_wave0, std_mag)
 
     #-- should we down-sample the template?
     # std_wave = np.arange(np.nanmin(obj_wave), np.nanmax(obj_wave),
@@ -941,15 +945,16 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
     obj_wave_ds = []
     std_flux_ds = []
     for i in range(len(std_wave)):
-        rng = np.where((obj_wave>std_wave[i]) &
+        rng = np.where((obj_wave>=std_wave[i]) &
                        (obj_wave<std_wave[i]+std_wth[i]) )
 
-        IsH = np.where((balmer>std_wave[i]) &
+        IsH = np.where((balmer>=std_wave[i]) &
                        (balmer<std_wave[i]+std_wth[i]) )
 
         # does this bin contain observed spectra, and no Balmer line?
         if (len(rng[0]) > 1) and (len(IsH[0]) == 0):
-            obj_flux_ds.append(np.sum(obj_flux[rng])/std_wth[i])
+            # obj_flux_ds.append(np.sum(obj_flux[rng]) / std_wth[i])
+            obj_flux_ds.append( np.mean(obj_flux[rng]) )
             obj_wave_ds.append(std_wave[i])
             std_flux_ds.append(std_flux[i])
 
@@ -959,8 +964,8 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
     ratio = np.abs(np.array(std_flux_ds,dtype='float') /
                    np.array(obj_flux_ds,dtype='float'))
 
-    obj_wave_std = np.abs(obj_wave[1:]-obj_wave[:-1])
-    obj_wave_std = np.append(obj_wave_std, obj_wave_std[-1])
+    # obj_wave_std = np.abs(obj_wave[1:]-obj_wave[:-1])
+    # obj_wave_std = np.append(obj_wave_std, obj_wave_std[-1])
 
 
     # interp calibration (sensfunc) on to object's wave grid
@@ -984,20 +989,20 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5):
         fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
         sensfunc2 = np.polyval(fit, obj_wave)
 
-    # plt.figure()
-    # plt.plot(obj_wave, obj_flux/obj_wave_std,'k')
-    # plt.plot(obj_wave_ds, obj_flux_ds,'bo')
-    # plt.show()
-    #
-    # plt.figure()
-    # plt.plot(obj_wave_ds, LogSensfunc,'ko')
-    # plt.plot(obj_wave, sensfunc2)
-    # plt.show()
-    #
-    # plt.figure()
-    # plt.plot(obj_wave, obj_flux/obj_wave_std*(10**sensfunc2),'k')
-    # plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
-    # plt.show()
+    plt.figure()
+    plt.plot(obj_wave, obj_flux,'k')
+    plt.plot(obj_wave_ds, obj_flux_ds,'bo')
+    plt.show()
+
+    plt.figure()
+    plt.plot(obj_wave_ds, LogSensfunc,'ko')
+    plt.plot(obj_wave, sensfunc2)
+    plt.show()
+
+    plt.figure()
+    plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k')
+    plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
+    plt.show()
 
     return 10**sensfunc2
 
@@ -1095,7 +1100,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     # assume specfile is a list of file names of object
     bias = biascombine(biaslist, trim=trim)
-    flat,fmask_out = flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=True,
+    flat,fmask_out = flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
                                  flat_poly=flat_order, response=flat_response)
 
     if HeNeAr_prev is False:
@@ -1182,8 +1187,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                               sens_wave, sens_flux)
 
         # the width of each pixel in wavelength units
-        wave_std = np.abs(wfinal[1:]-wfinal[:-1])
-        wave_std = np.append(wave_std, wave_std[-1])
+        # wave_std = np.abs(wfinal[1:]-wfinal[:-1])
+        # wave_std = np.append(wave_std, wave_std[-1])
 
 
         if write_reduced is True:

@@ -67,7 +67,10 @@ def _OpenImg(file, trim=True):
         raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
     else:
         raw = hdu[0].data
-    airmass = hdu[0].header['AIRMASS']
+    try:
+        airmass = hdu[0].header['AIRMASS']
+    except KeyError:
+        airmass = 1.0
     exptime = hdu[0].header['EXPTIME']
     hdu.close(closed=True)
     return raw, exptime, airmass
@@ -290,6 +293,10 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     popt_tot,pcov = curve_fit(_gaus, yi, ztot,
                           p0=[np.nanmax(ztot), np.median(ztot), peak_y, 2.])
 
+    # plt.figure()
+    # plt.plot(yi, ztot)
+    # plt.show()
+
     # define the bin edges
     xbins = np.linspace(0, img.shape[1], nsteps)
     ybins = np.zeros_like(xbins)
@@ -421,7 +428,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
             # evaluate the polynomial across the aperture, and sum
             skysubflux[i] = np.sum(np.polyval(pfit, ap))
         elif (skydeg==0):
-            skysubflux[i] = np.median(z)*apwidth*2.0
+            skysubflux[i] = np.mean(z)*apwidth*2.0
 
 
     return skysubflux
@@ -921,7 +928,8 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
     return airmass_ext * obj_flux
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5, display=False):
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5,
+               display=False):
     """
 
     Parameters
@@ -1005,7 +1013,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5, display
     if mode=='linear':
         sensfunc2 = np.interp(obj_wave, obj_wave_ds, LogSensfunc)
     elif mode=='spline':
-        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.005)
+        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.0025)
         sensfunc2 = spl(obj_wave)
     elif mode=='poly':
         fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
@@ -1051,11 +1059,11 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-               stdstar='', trace1=False, ntracesteps=25,
+               stdstar='', trace1=False, ntracesteps=15,
                flat_mode='spline', flat_order=9, flat_response=True,
-               apwidth=3,skysep=25,skywidth=75, skydeg=2,
+               apwidth=8,skysep=3,skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=False,
-               HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
+               HeNeAr_tol=20, HeNeAr_order=3, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
     """
     A wrapper routine to carry out the full steps of the spectral

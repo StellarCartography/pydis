@@ -337,7 +337,7 @@ def ap_trace(img, fmask=(1,), nsteps=50):
 
 
 
-def ap_extract(img, trace, apwidth=5.0):
+def ap_extract(img, trace, apwidth=8):
     """
     Extract the spectrum using the trace. Simply add up all the flux
     around the aperture within a specified +/- width.
@@ -383,7 +383,7 @@ def ap_extract(img, trace, apwidth=5.0):
 
 
 
-def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
+def sky_fit(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0):
     """
     Fits a polynomial to the sky at each column
 
@@ -918,7 +918,28 @@ def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
     return
 
 
-def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
+def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='kpnoextinct.dat'):
+    """
+    Correct the spectrum based on the airmass
+
+    Parameters
+    ----------
+    obj_wave : 1-d array
+        The 1-d wavelength array of the spectrum
+    obj_flux : 1-d array
+        The 1-d flux array of the spectrum
+    airmass : float
+        The value of the airmass, not the header keyword.
+    airmass_file : str, optional
+        The name of the airmass extinction file. This routine assumes
+        the file is stored in the resources/ subdirectory. Available files
+        are: apoextinct.dat, kpnoextinct.dat, ctioextinct.dat
+        (Default is kpnoextinct.dat)
+
+    Returns
+    -------
+    The flux array
+    """
     # read in the airmass extinction curve
     dir = os.path.dirname(os.path.realpath(__file__))+'/resources/'
     if len(airmass_file)==0:

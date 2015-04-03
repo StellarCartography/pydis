@@ -67,10 +67,17 @@ def _OpenImg(file, trim=True):
         raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
     else:
         raw = hdu[0].data
+
     try:
         airmass = hdu[0].header['AIRMASS']
     except KeyError:
-        airmass = 1.0
+        try:
+            # try using the Zenith Distance (assume in degrees)
+            ZD = hdu[0].header['ZD'] / 180.0 * np.pi
+            airmass = 1.0/np.cos(ZD) # approximate airmass
+        except KeyError:
+            airmass = 1.0
+
     exptime = hdu[0].header['EXPTIME']
     hdu.close(closed=True)
     return raw, exptime, airmass
@@ -435,7 +442,7 @@ def sky_fit(img, trace, apwidth=5, skysep=25, skywidth=75, skydeg=2):
 
 
 
-def HeNeAr_fit(calimage, linelist='', interac=True,
+def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                trim=True, fmask=(1,), display=True,
                tol=10, fit_order=2, previous='',mode='poly'):
     """
@@ -458,8 +465,8 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
     calimage : str
         Path to the HeNeAr calibration image
     linelist : str, optional
-        Path to the linelist file to use. Only needed if using the
-        automatic mode.
+        The linelist file to use in the resources/linelists/ directory.
+        Only used in automatic mode. (Default is apohenear.dat)
     interac : bool, optional
         Should the HeNeAr identification be done interactively (manually)?
         (Default is True)
@@ -522,7 +529,7 @@ def HeNeAr_fit(calimage, linelist='', interac=True,
         # find the linelist of choice
         if (len(linelist)==0):
             dir = os.path.dirname(os.path.realpath(__file__))
-            linelist = dir + '/resources/dishigh_linelist.txt'
+            linelist = dir + '/resources/linelists/'+linelist
 
         # import the linelist
         linewave = np.loadtxt(linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
@@ -911,21 +918,21 @@ def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
     return
 
 
-def AirmassCor(obj_wave, obj_flux, airmass, airmass_file=''):
-    # read in the airmass curve for APO
+def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
+    # read in the airmass extinction curve
+    dir = os.path.dirname(os.path.realpath(__file__))+'/resources/'
     if len(airmass_file)==0:
-        dir = os.path.dirname(os.path.realpath(__file__))
-        air_wave, air_trans = np.loadtxt(dir+'/resources/apoextinct.dat',
-                                         unpack=True,skiprows=2)
+        air_wave, air_cor = np.loadtxt(dir+airmass_file,
+                                       unpack=True,skiprows=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
-        print('  Note: first 2 rows are skipped, assuming header.')
-        air_wave, air_trans = np.loadtxt(airmass_file,
-                                         unpack=True,skiprows=2)
-
-    #this isnt quite right...
-    airmass_ext = np.interp(obj_wave, air_wave, air_trans) / airmass
-    return airmass_ext * obj_flux
+        print('  Note: first 2 rows are skipped, assuming header')
+        air_wave, air_cor = np.loadtxt(dir+airmass_file,
+                                       unpack=True,skiprows=2)
+    # air_cor in units of mag/airmass
+    airmass_ext = 10.0**(0.4 * airmass *
+                         np.interp(obj_wave, air_wave, air_cor))
+    return obj_flux * airmass_ext
 
 
 def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5,
@@ -1060,6 +1067,7 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=15,
+               airmass_file='apoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8,skysep=3,skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=False,
@@ -1204,10 +1212,9 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         #     (counts / sec)
         flux_red = (ext_spec - sky)
 
-        # now get extinction correction
-        extcor = AirmassCor(wfinal, flux_red, airmass)
-        # and apply it...
-        flux_red_x = flux_red #* extcor
+        # now correct the spectrum for airmass extinction
+        flux_red_x = AirmassCor(wfinal, flux_red, airmass,
+                                airmass_file=airmass_file)
 
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!

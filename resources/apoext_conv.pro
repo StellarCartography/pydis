@@ -62,6 +62,16 @@ pro APOext_conv
   legend,box=0,['!7APO old','APO new'],color=[250,50],linestyle=0,/right,charsize=1
   device,/close
 
+  
+  device,filename='apo_ext_problem.eps',/encap,/color
+  plot,wa_out,10.0^(0.4*ma_out),/ysty,yrange=[0,3],xrange=[3300,10000],$
+       ytitle='Flux correction @ X=1',thick=3
+  oplot,wa,10.0^(0.4*fa),linesty=2,color=250,thick=3
+  legend,['right','wrong'],linestyle=[0,2],/bottom,box=0,$
+         charsize=1,color=[0,250]
+  device,/close
+  
+  
   set_plot,'X'
 
   openw, lun, 'apoextinct.dat', /get_lun

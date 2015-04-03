@@ -780,11 +780,15 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
             # ylabel('wavelength')
 
+            print(" ")
             print('> How does this look?  Enter "d" to be done (accept), ')
             print('  or a number to change the polynomial order and re-fit')
             print('> Currently fit_order = '+str(fit_order))
+            print(" ")
+
             plt.show()
 
+            print(' ')
             done = str(raw_input('d/#: '))
 
 
@@ -947,7 +951,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='kpnoextinct.dat'):
                                        unpack=True,skiprows=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
-        print('  Note: first 2 rows are skipped, assuming header')
+        # print('  Note: first 2 rows are skipped, assuming header')
         air_wave, air_cor = np.loadtxt(dir+airmass_file,
                                        unpack=True,skiprows=2)
     # air_cor in units of mag/airmass
@@ -1088,12 +1092,13 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=15,
-               airmass_file='apoextinct.dat',
+               airmass_file='kpnoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8,skysep=3,skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=3, displayHeNeAr=False,
-               trim=True, write_reduced=True, display=True):
+               trim=True, write_reduced=True,
+               display=True, display_final=True):
     """
     A wrapper routine to carry out the full steps of the spectral
     reduction and calibration. Steps include:
@@ -1161,6 +1166,10 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     display : bool, optional
         Set to True to display intermediate steps along the way.
         (Default is True)
+    display_final : bool, optional
+        Set to False to suppress plotting the final reduced spectrum to
+        the screen. Useful for running in quiet batch mode. (Default is
+        True)
 
     """
 
@@ -1184,6 +1193,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     for i in range(len(specfile)):
         spec = specfile[i]
+        print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
         raw, exptime, airmass = _OpenImg(spec, trim=trim)
 
         # remove bias and flat, divide by exptime
@@ -1283,23 +1293,28 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             lout.write('HeNeAr_order = '+str(HeNeAr_order)+'\n')
             lout.write('trace1       = '+str(trace1)+'\n')
             lout.write('ntracesteps  = '+str(ntracesteps)+'\n')
+            lout.write('trim         = '+str(trim)+'\n')
+            lout.write('response     = '+str(flat_response)+'\n')
             lout.write('apwidth      = '+str(apwidth)+'\n')
             lout.write('skysep       = '+str(skysep)+'\n')
             lout.write('skywidth     = '+str(skywidth)+'\n')
-            lout.write('trim         = '+str(trim)+'\n')
+            lout.write('skydeg       = '+str(skydeg)+'\n')
+            lout.write('stdstar      = '+str(stdstar)+'\n')
+            lout.write('airmass_file = '+str(airmass_file)+'\n')
             lout.close()
 
 
-        # the final figure to plot
-        plt.figure()
-        plt.plot(wfinal, ffinal)
-        plt.xlabel('Wavelength')
-        plt.ylabel('Counts / sec')
-        plt.title(spec)
-        #plot within percentile limits
-        plt.ylim( (np.percentile(ffinal,2),
-                   np.percentile(ffinal,98)) )
-        plt.show()
+        if display_final is True:
+            # the final figure to plot
+            plt.figure()
+            plt.plot(wfinal, ffinal)
+            plt.xlabel('Wavelength')
+            plt.ylabel('Counts / sec')
+            plt.title(spec)
+            #plot within percentile limits
+            plt.ylim( (np.percentile(ffinal,2),
+                       np.percentile(ffinal,98)) )
+            plt.show()
 
     return
 

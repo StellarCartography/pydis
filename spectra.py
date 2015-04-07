@@ -1322,15 +1322,21 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
 
 def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
-               stdstar='', trace1=False, ntracesteps=25,
+               stdstar='', trace1=False, ntracesteps=15,
                flat_mode='spline', flat_order=9, flat_response=True,
-               apwidth=3,skysep=25,skywidth=75, skydeg=2,
+               apwidth=6,skysep=1,skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=False,
                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
                trim=True, write_reduced=True, display=True):
     """
-    A special version of autoreduce, that assumes all the target images want to be
-    median co-added and then extracted
+    A special version of autoreduce, that assumes all the target images
+    want to be median co-added and then extracted. All images have flat
+    and bias removed first, then are combined. Trace and Extraction
+    happens only on the final combined image.
+
+    Assumes file names in speclist are the standard star, followed by all the target
+    images you want to co-add.
+
 
     """
     #-- the basic crap, used for all frames
@@ -1391,7 +1397,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
 
 
 
-def CoAdd(frames, mode='mean'):
+def CoAddFinal(frames, mode='mean'):
     # co-add FINSIHED, reduced spectra
     # only trick: resample on to wavelength grid of 1st frame
     files = np.loadtxt(frames, dtype='string',unpack=True)

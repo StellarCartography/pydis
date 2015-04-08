@@ -527,12 +527,14 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         print("Doing automatic wavelength calibration on HeNeAr.")
         print("Note, this is not very robust. Suggest you re-run with interac=True")
         # find the linelist of choice
-        if (len(linelist)==0):
-            dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
-            linelist = dir +linelist
+
+        dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+        # if (len(linelist)==0):
+        #     linelist = dir +linelist
 
         # import the linelist
-        linewave = np.loadtxt(dir+linelist,dtype='float',skiprows=1,usecols=(0,),unpack=True)
+        linewave = np.loadtxt(dir + linelist,dtype='float',
+                              skiprows=1,usecols=(0,),unpack=True)
 
         # sort data, cut top x% of flux data as peak threshold
         flux_thresh = np.percentile(slice, 97)

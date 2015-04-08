@@ -1097,7 +1097,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                airmass_file='kpnoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8,skysep=3,skywidth=7, skydeg=0,
-               HeNeAr_prev=False, HeNeAr_interac=False,
+               HeNeAr_prev=False, HeNeAr_interac=True,
                HeNeAr_tol=20, HeNeAr_order=3, displayHeNeAr=False,
                trim=True, write_reduced=True,
                display=True, display_final=True):
@@ -1256,7 +1256,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                                    mode='spline',polydeg=12)
             sens_wave = wfinal
 
-        elif (i==0):
+        elif (len(stdstar) == 0) and (i==0):
             # if 1st obj not the std, then just make array of 1's to multiply thru
             sens_flux = np.ones_like(flux_red_x)
             sens_wave = wfinal

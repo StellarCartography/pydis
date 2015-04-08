@@ -3,42 +3,8 @@ A simple reduction package for one dimensional longslit spectroscopy using Pytho
 
 The goal of *SPECTRA* is to provide a turn-key solution for reducing and understanding longslit spectroscopy, which could ideally be done in real time. Currently we are using many simple assumptions to get a quick-and-dirty solution, and modeling the workflow after the robust industry standards set by IRAF. Additionally, we have only used data from the low/medium resolution [APO 3.5-m](http://www.apo.nmsu.edu) "Dual Imaging Spectrograph" (DIS). Therefore, many instrument specific assumptions are being made.
 
-
-
 ## Examples
-#### Auto-reduce my data!
-
-The goal is to make SPECTRA as easy to use while observing as possible. Here is an example of a script you might run over and over throughout the night:
-
-````python 
-# if SPECTRA isn't in the currnet working directory, add to path
-import sys
-sys.path.append('/path/to/spectra/')
-
-# must import, of course
-import spectra
-    
-spectra.autoreduce('objlist.txt', 'flatlist.txt', 'biaslist.txt',
-                 'HeNeAr.0005r.fits', stdstar='fiege34')
-````
-
-The `autoreduce` function must be given a list of target objects, a list of flats frames, a list of bias frames, and the path to one HeNeAr calibration frame. In this example, the HeNeAr frame is automatically fit, which usually works reasonably well but should not be trusted for e.g. sub-pixel velocity calibration.
-
-*Many* keywords are available to customize the `autoreduce` function for most needs.
-
-
-#### Manually reduce stuff
-You can also use each component of the reduction process. For example, if you wanted to combine all your flat and bias frames:
-
-````python 
-bias = spectra.biascombine('biaslist.txt')
-flat, mask = spectra.flatcombine('flatlist.txt', bias)
-````
-
-The resulting flat and bias frames are returned as numpy arrays. By default these functions will write files called **BIAS.fits** and **FLAT.fits**, unless a different name is specified using the `output = 'file.fits'` keyword.
-Note also that `flatcombine` returns both the data array and a 1-d "mask" array, which determines from the flat the portion of the CCD that is illuminated.
-
-
+See [this page](https://github.com/jradavenport/spectra/wiki/Examples) on the Wiki for worked examples of reducing DIS data!
 
 
 ## Motivation

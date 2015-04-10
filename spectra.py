@@ -336,55 +336,15 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     return my
 
 
-
-def ap_extract(img, trace, apwidth=8):
+def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
+               coaddN=1):
     """
     Extract the spectrum using the trace. Simply add up all the flux
     around the aperture within a specified +/- width.
 
     Note: implicitly assumes wavelength axis is perfectly vertical within
-    the trace. An important simplification.
+    the trace. An major simplification at present. To be changed!
 
-    Parameters
-    ----------
-    img : 2d numpy array
-        This is the image, stored as a normal numpy array. Can be read in
-        using astropy.io.fits like so:
-        >>> hdu = fits.open('file.fits')
-        >>> img = hdu[0].data
-    trace : 1-d array
-        The spatial positions (Y axis) corresponding to the center of the
-        trace for every wavelength (X axis), as returned from ap_trace
-    apwidth : int, optional
-        The width along the Y axis of the trace to extract. Note: a fixed
-        width is used along the whole trace. (default is 5 pixels)
-
-    Returns
-    -------
-    onedspec : array
-        The summed flux at each column about the trace. Note: is not
-        sky subtracted!
-    """
-
-    onedspec = np.zeros_like(trace)
-    for i in range(0,len(trace)):
-        # juuuust in case the trace gets too close to the edge
-        # (shouldn't be common)
-        widthup = apwidth
-        widthdn = apwidth
-        if (trace[i]+widthup > img.shape[0]):
-            widthup = img.shape[0]-trace[i] - 1
-        if (trace[i]-widthdn < 0):
-            widthdn = trace[i] - 1
-
-        # simply add up the total flux around the trace +/- width
-        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup, i].sum()
-    return onedspec
-
-
-
-def sky_fit(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0):
-    """
     Fits a polynomial to the sky at each column
 
     Note: implicitly assumes wavelength axis is perfectly vertical within
@@ -415,13 +375,34 @@ def sky_fit(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0):
 
     Returns
     -------
-    skysubflux : 1d array
+    onedspec : 1-d array
+        The summed flux at each column about the trace. Note: is not
+        sky subtracted!
+    skysubflux : 1-d array
         The integrated sky values along each column, suitable for
         subtracting from the output of ap_extract
+    fluxerr : 1-d array
+        the uncertainties of the flux values
     """
 
+    onedspec = np.zeros_like(trace)
     skysubflux = np.zeros_like(trace)
+    fluxerr = np.zeros_like(trace)
+
     for i in range(0,len(trace)):
+        #-- first do the aperture flux
+        # juuuust in case the trace gets too close to the edge
+        widthup = apwidth
+        widthdn = apwidth
+        if (trace[i]+widthup > img.shape[0]):
+            widthup = img.shape[0]-trace[i] - 1
+        if (trace[i]-widthdn < 0):
+            widthdn = trace[i] - 1
+
+        # simply add up the total flux around the trace +/- width
+        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup, i].sum()
+
+        #-- now do the sky fit
         itrace = int(trace[i])
         y = np.append(np.arange(itrace-apwidth-skysep-skywidth, itrace-apwidth-skysep),
                       np.arange(itrace+apwidth+skysep, itrace+apwidth+skysep+skywidth))
@@ -437,9 +418,17 @@ def sky_fit(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0):
         elif (skydeg==0):
             skysubflux[i] = np.mean(z)*apwidth*2.0
 
+        #-- finally, compute the error in this pixel
+        sigB = np.std(z) # stddev in the background data
+        N_B = len(y) # number of bkgd pixels
+        N_A = apwidth*2. # number of aperture pixels
 
-    return skysubflux
+        # based on aperture phot err description by F. Masci, Caltech:
+        # http://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
+        fluxerr[i] = np.sqrt(np.sum((onedspec[i]-skysubflux[i])/coaddN) +
+                             (N_A + N_A**2. / N_B) * (sigB**2.))
 
+    return onedspec, skysubflux, fluxerr
 
 
 def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
@@ -912,7 +901,6 @@ def mapwavelength(trace, wavemap, mode='poly'):
     return trace_wave
 
 
-
 def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
     # not yet
     if (poly is False) and (spline is False):
@@ -1078,7 +1066,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5,
     return 10**sensfunc2
 
 
-def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
+def ApplyFluxCal(obj_wave, obj_flux, obj_err, cal_wave, sensfunc):
     # the sensfunc should already be BASICALLY at the same wavelenths as the targets
     # BUT, just in case, we linearly resample it:
 
@@ -1088,7 +1076,7 @@ def ApplyFluxCal(obj_wave, obj_flux, cal_wave, sensfunc):
     sensfunc2 = np.interp(obj_wave, cal_wave[ss], sensfunc[ss])
 
     # then simply apply re-sampled sensfunc to target flux
-    return obj_flux * sensfunc2
+    return obj_flux * sensfunc2, obj_err * sensfunc2
 
 
 #########################
@@ -1211,12 +1199,10 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         if (i==0) or (trace1 is False):
             trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
 
-        # extract the spectrum
-        ext_spec = ap_extract(data, trace, apwidth=apwidth)
-
-        # measure sky values along trace
-        sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,
-                      skywidth=skywidth,skydeg=skydeg)
+        # extract the spectrum, measure sky values along trace, get flux errors
+        ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
+                                            skysep=skysep,skywidth=skywidth,
+                                            skydeg=skydeg,coaddN=1)
 
         xbins = np.arange(data.shape[1])
         if display is True:
@@ -1261,13 +1247,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             sens_flux = np.ones_like(flux_red_x)
             sens_wave = wfinal
 
-
         # final step in reduction, apply sensfunc
-        ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
-
-        # the width of each pixel in wavelength units
-        # wave_std = np.abs(wfinal[1:]-wfinal[:-1])
-        # wave_std = np.append(wave_std, wave_std[-1])
+        ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
 
         if write_reduced is True:
@@ -1280,9 +1261,9 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
             # write the final spectrum out
             fout = open(spec+'.spec','w')
-            fout.write('#  This file contains the final extracted wavelength,counts data \n')
+            fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
             for k in range(len(wfinal)):
-                fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + '\n')
+                fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + str(efinal[k]) + '\n')
             fout.close()
 
             now = datetime.datetime.now()
@@ -1359,16 +1340,17 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     raw, exptime, airmass = _OpenImg(spec, trim=trim)
     data = ((raw - bias) / flat) / exptime
     trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
-    ext_spec = ap_extract(data, trace, apwidth=apwidth)
-    sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,
-                  skywidth=skywidth,skydeg=skydeg)
+    # extract the spectrum, measure sky values along trace, get flux errors
+    ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
+                                        skysep=skysep,skywidth=skywidth,
+                                        skydeg=skydeg,coaddN=1)
     xbins = np.arange(data.shape[1])
     wfinal = mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
     sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
                            mode='spline',polydeg=12)
     sens_wave = wfinal
-    ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
+    ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
     #-- the target star exposures, stack and proceed
     for i in range(1,len(specfile)):
@@ -1380,13 +1362,14 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
         elif (i>1):
             all_data = np.dstack( (all_data, data_i))
     data = np.median(all_data, axis=2)
-    ext_spec = ap_extract(data, trace, apwidth=apwidth)
-    sky = sky_fit(data, trace, apwidth=apwidth,skysep=skysep,
-                  skywidth=skywidth,skydeg=skydeg)
+    # extract the spectrum, measure sky values along trace, get flux errors
+    ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
+                                        skysep=skysep,skywidth=skywidth,
+                                        skydeg=skydeg,coaddN=len(specfile))
     xbins = np.arange(data.shape[1])
     wfinal = mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
-    ffinal = ApplyFluxCal(wfinal, flux_red_x, sens_wave, sens_flux)
+    ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
     plt.figure()
     plt.plot(wfinal, ffinal)
@@ -1395,7 +1378,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
                    np.percentile(ffinal,95)) )
     plt.show()
 
-    return wfinal, ffinal
+    return wfinal, ffinal, efinal
 
 
 

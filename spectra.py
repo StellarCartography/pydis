@@ -14,6 +14,7 @@ e.g. DIS specifics:
 
 import matplotlib
 matplotlib.use('TkAgg')
+
 from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,6 +27,7 @@ import scipy.signal
 import datetime
 import os
 from matplotlib.widgets import Cursor
+from matplotlib.widgets import SpanSelector
 
 
 
@@ -266,7 +268,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
     return flat ,ok[0]
 
 
-def ap_trace(img, fmask=(1,), nsteps=50):
+def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
     """
     Trace the spectrum aperture in an image
 
@@ -314,23 +316,51 @@ def ap_trace(img, fmask=(1,), nsteps=50):
     ztot = img_sm.sum(axis=1)[ydata]
     yi = np.arange(img.shape[0])[ydata]
     peak_y = yi[np.nanargmax(ztot)]
-    popt_tot,pcov = curve_fit(_gaus, yi, ztot,
-                          p0=[np.nanmax(ztot), np.median(ztot), peak_y, 2.])
+    peak_guess = [np.nanmax(ztot), np.median(ztot), peak_y, 2.]
 
-    # plt.figure()
-    # plt.plot(yi, ztot)
-    # plt.show()
+    if interac is True:
+        class InteracTrace:
+            def __init__(self):
+                self.fig = plt.figure(1)
+                self.ax = self.fig.add_subplot(111)
+                self.ax.plot(yi, ztot)
+                plt.ylabel('Counts (Image summed in X direction)')
+                plt.xlabel('Y Pixel')
+                plt.title('Click on object!')
 
-    # define the bin edges
+                self.cursor = Cursor(self.ax, useblit=False, horizOn=False,
+                                     color='red', linewidth=1 )
+                cid = self.fig.canvas.mpl_connect('button_press_event',
+                                                  self.__onclick__)
+                plt.show()
+                return
+
+            def __onclick__(self,click):
+                if self.fig.canvas.manager.toolbar._active is None:
+                    self.xpoint = click.xdata
+                    self.ypoint = click.ydata
+                    plt.close(1) # close window when clicked
+                    return self.xpoint, self.ypoint
+                else:
+                    pass
+
+        theclick = InteracTrace()
+        xcl = theclick.xpoint
+        # ycl = theclick.ypoint
+        peak_guess[2] = xcl
+
+    popt_tot, pcov = curve_fit(_gaus, yi, ztot, p0=peak_guess)
+    ydata2 = ydata[np.where((ydata>=popt_tot[2] - popt_tot[3]*5.) &
+                            (ydata<=popt_tot[2] + popt_tot[3]*5.))]
+
+    yi = np.arange(img.shape[0])[ydata2]
+    # define the X-bin edges
     xbins = np.linspace(0, img.shape[1], nsteps)
     ybins = np.zeros_like(xbins)
 
     for i in range(0,len(xbins)-1):
-        #-- simply use the max w/i each window
-        #ybins[i] = np.argmax(img_sm[:,xbins[i]:xbins[i+1]].sum(axis=1))
-        
         #-- fit gaussian w/i each window
-        zi = img_sm[ydata, xbins[i]:xbins[i+1]].sum(axis=1)
+        zi = img_sm[ydata2, xbins[i]:xbins[i+1]].sum(axis=1)
         pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
         popt,pcov = curve_fit(_gaus, yi, zi, p0=pguess)
 
@@ -1108,7 +1138,8 @@ def ApplyFluxCal(obj_wave, obj_flux, obj_err, cal_wave, sensfunc):
 
 #########################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
-               stdstar='', trace1=False, ntracesteps=15,
+               stdstar='', trace_recenter=False, trace_interac=True,
+               trace1=False, ntracesteps=15,
                airmass_file='kpnoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8,skysep=3,skywidth=7, skydeg=0,
@@ -1148,6 +1179,12 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         speclist. Useful if e.g. science targets are faint, and first
         object is a bright standard star. Note: assumes star placed at
         same position in spatial direction. (Default is False)
+    trace_recenter : bool, optional
+        If trace1=True, set this to True to allow for small linear
+        adjustments to the trace (default is False)
+    trace_interac : bool, optional
+        Set to True if user should interactively select aperture center
+        for each object spectrum. (Default is True)
     ntracesteps : int, optional
         Number of bins in X direction to chop image into. Use
         fewer bins if ap_trace is having difficulty, such as with faint
@@ -1224,7 +1261,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
         # with reduced data, trace the aperture
         if (i==0) or (trace1 is False):
-            trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
+            trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+                             recenter=trace_recenter, interac=trace_interac)
 
         # extract the spectrum, measure sky values along trace, get flux errors
         ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,

@@ -840,7 +840,10 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
             pguess = [np.nanmax(yline),img_med,cguess,2.]
-            popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+            try:
+                popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+            except RuntimeError:
+                popt = pguess
             cguess = popt[2] # update center pixel
 
             xcent_big = np.append(xcent_big, popt[2])
@@ -1203,7 +1206,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
 
     # read in the list of target spectra
-    specfile = np.loadtxt(speclist,dtype='string')
+    specfile = np.loadtxt(speclist, dtype='string')
 
     for i in range(len(specfile)):
         spec = specfile[i]

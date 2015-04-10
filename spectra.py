@@ -321,7 +321,7 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
     if interac is True:
         class InteracTrace:
             def __init__(self):
-                self.fig = plt.figure(1)
+                self.fig = plt.figure()
                 self.ax = self.fig.add_subplot(111)
                 self.ax.plot(yi, ztot)
                 plt.ylabel('Counts (Image summed in X direction)')
@@ -340,15 +340,20 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
                 if self.fig.canvas.manager.toolbar._active is None:
                     self.xpoint = click.xdata
                     self.ypoint = click.ydata
-                    plt.close(1) # close window when clicked
+                    self.disconnect(self.ClickID) # disconnect from event
+                    self.cursor.disconnect_events()
+                    self.cursor._update()
+                    plt.close() # close window when clicked
                     return self.xpoint, self.ypoint
                 else:
                     pass
 
         theclick = InteracTrace()
         plt.show()
+
         xcl = theclick.xpoint
         # ycl = theclick.ypoint
+
         peak_guess[2] = xcl
 
     popt_tot, pcov = curve_fit(_gaus, yi, ztot, p0=peak_guess)

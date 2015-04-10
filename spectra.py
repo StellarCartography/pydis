@@ -83,6 +83,23 @@ def _OpenImg(file, trim=True):
     return raw, exptime, airmass
 
 
+def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
+    # write file with the trace (y positions)
+    tout = open(spec+'.trace','w')
+    tout.write('#  This file contains the x,y coordinates of the trace \n')
+    for k in range(len(trace)):
+        tout.write(str(k)+', '+str(trace[k]) + '\n')
+    tout.close()
+
+    # write the final spectrum out
+    fout = open(spec+'.spec','w')
+    fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
+    for k in range(len(wfinal)):
+        fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + ', ' + str(efinal[k]) + '\n')
+    fout.close()
+    return
+
+
 def biascombine(biaslist, output='BIAS.fits', trim=True):
     """
     Combine the bias frames in to a master bias image. Currently only
@@ -339,16 +356,18 @@ def ap_trace(img, fmask=(1,), nsteps=50):
 def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
                coaddN=1):
     """
-    Extract the spectrum using the trace. Simply add up all the flux
+    1. Extract the spectrum using the trace. Simply add up all the flux
     around the aperture within a specified +/- width.
 
     Note: implicitly assumes wavelength axis is perfectly vertical within
     the trace. An major simplification at present. To be changed!
 
-    Fits a polynomial to the sky at each column
+    2. Fits a polynomial to the sky at each column
 
     Note: implicitly assumes wavelength axis is perfectly vertical within
     the trace. An important simplification.
+
+    3. Computes the uncertainty in each pixel
 
     Parameters
     ----------
@@ -1252,19 +1271,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
 
         if write_reduced is True:
-            # write file with the trace (y positions)
-            tout = open(spec+'.trace','w')
-            tout.write('#  This file contains the x,y coordinates of the trace \n')
-            for k in range(len(trace)):
-                tout.write(str(k)+', '+str(trace[k]) + '\n')
-            tout.close()
-
-            # write the final spectrum out
-            fout = open(spec+'.spec','w')
-            fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
-            for k in range(len(wfinal)):
-                fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + ', ' + str(efinal[k]) + '\n')
-            fout.close()
+            _WriteSpec(spec, wfinal, ffinal, efinal, trace)
 
             now = datetime.datetime.now()
 

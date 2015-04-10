@@ -559,6 +559,8 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         pk = pk[pk > pwidth]
         pk = pk[pk < (len(slice)-pwidth)]
 
+        print('Found '+str(len(pk))+' peaks in HeNeAr to try')
+
         if display is True:
             plt.figure()
             plt.plot(wtemp, slice, 'b')
@@ -852,7 +854,10 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
             pguess = [np.nanmax(yline),img_med,cguess,2.]
-            popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+            try:
+                popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+            except RuntimeError:
+                popt = pguess
             cguess = popt[2] # update center pixel
 
             xcent_big = np.append(xcent_big, popt[2])

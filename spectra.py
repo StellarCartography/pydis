@@ -330,9 +330,10 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
 
                 self.cursor = Cursor(self.ax, useblit=False, horizOn=False,
                                      color='red', linewidth=1 )
-                cid = self.fig.canvas.mpl_connect('button_press_event',
-                                                  self.__onclick__)
-                plt.show()
+                self.connect = self.fig.canvas.mpl_connect
+                self.disconnect = self.fig.canvas.mpl_disconnect
+                self.ClickID = self.connect('button_press_event', self.__onclick__)
+
                 return
 
             def __onclick__(self,click):
@@ -345,6 +346,7 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
                     pass
 
         theclick = InteracTrace()
+        plt.show()
         xcl = theclick.xpoint
         # ycl = theclick.ypoint
         peak_guess[2] = xcl

@@ -1263,7 +1263,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             fout = open(spec+'.spec','w')
             fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
             for k in range(len(wfinal)):
-                fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + str(efinal[k]) + '\n')
+                fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + ', ' + str(efinal[k]) + '\n')
             fout.close()
 
             now = datetime.datetime.now()
@@ -1290,9 +1290,10 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         if display_final is True:
             # the final figure to plot
             plt.figure()
-            plt.plot(wfinal, ffinal)
+            # plt.plot(wfinal, ffinal)
+            plt.errorbar(wfinal, ffinal, yerr=efinal)
             plt.xlabel('Wavelength')
-            plt.ylabel('Counts / sec')
+            plt.ylabel('Flux')
             plt.title(spec)
             #plot within percentile limits
             plt.ylim( (np.percentile(ffinal,2),

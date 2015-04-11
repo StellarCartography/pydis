@@ -418,6 +418,7 @@ def ap_trace(img, fmask=(1,), nsteps=50, interac=False,
         # plt.plot(mx,my-popt_tot[3]*bigbox,'y')
         plt.show()
 
+    print("> Trace gaussian width = "+str(popt_tot[3])+' pixels')
     return my
 
 

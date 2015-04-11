@@ -44,7 +44,7 @@ def _gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 
-def _OpenImg(file, trim=True):
+def OpenImg(file, trim=True):
     """
     A simple wrapper for astropy.io.fits (pyfits) to open and extract
     the data we want from images and headers.
@@ -1286,7 +1286,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     for i in range(len(specfile)):
         spec = specfile[i]
         print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
-        raw, exptime, airmass = _OpenImg(spec, trim=trim)
+        raw, exptime, airmass = OpenImg(spec, trim=trim)
 
         # remove bias and flat, divide by exptime
         data = ((raw - bias) / flat) / exptime
@@ -1428,7 +1428,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     #-- the standard star, set the stage
     specfile = np.loadtxt(speclist,dtype='string')
     spec = specfile[0]
-    raw, exptime, airmass = _OpenImg(spec, trim=trim)
+    raw, exptime, airmass = OpenImg(spec, trim=trim)
     data = ((raw - bias) / flat) / exptime
     trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
     # extract the spectrum, measure sky values along trace, get flux errors
@@ -1446,7 +1446,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     #-- the target star exposures, stack and proceed
     for i in range(1,len(specfile)):
         spec = specfile[i]
-        raw, exptime, airmass = _OpenImg(spec, trim=trim)
+        raw, exptime, airmass = OpenImg(spec, trim=trim)
         data_i = ((raw - bias) / flat) / exptime
         if (i==1):
             all_data = data_i

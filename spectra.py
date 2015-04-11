@@ -268,7 +268,8 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
     return flat ,ok[0]
 
 
-def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
+def ap_trace(img, fmask=(1,), nsteps=50, interac=False,
+             recenter=False, prevtrace=(0,), bigbox=15, display=True):
     """
     Trace the spectrum aperture in an image
 
@@ -291,6 +292,14 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
     fmask : array-like, optional
         A list of illuminated rows in the spatial direction (Y), as
         returned by flatcombine.
+    interac : bool, optional
+        Set to True to have user click on the y-coord peak. (Default is
+        False)
+    recenter : bool, optional
+        Set to True to use previous trace, but allow small shift in
+        position. Currently only allows linear shift (Default is False)
+    bigbox : float, optional
+        The number of sigma away from the main aperture to allow to trace
 
     Returns
     -------
@@ -298,6 +307,8 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
         The spatial (Y) positions of the trace, interpolated over the
         entire wavelength (X) axis
     """
+
+
     print('Tracing Aperture using nsteps='+str(nsteps))
     # the valid y-range of the chip
     if (len(fmask)>1):
@@ -312,13 +323,14 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
     # median smooth to crudely remove cosmic rays
     img_sm = scipy.signal.medfilt2d(img, kernel_size=(5,5))
 
-    #--- find the overall max row, and width
+    #--- Pick the strongest source, good if only 1 obj on slit
     ztot = img_sm.sum(axis=1)[ydata]
     yi = np.arange(img.shape[0])[ydata]
     peak_y = yi[np.nanargmax(ztot)]
     peak_guess = [np.nanmax(ztot), np.median(ztot), peak_y, 2.]
 
-    if interac is True:
+    #-- allow interactive mode, if mult obj on slit
+    if interac is True and recenter is False:
         class InteracTrace:
             def __init__(self):
                 self.fig = plt.figure()
@@ -356,9 +368,15 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
 
         peak_guess[2] = xcl
 
+    #-- use middle of previous trace as starting guess
+    if (recenter is True) and (len(prevtrace)>10):
+        peak_guess[2] = np.median(prevtrace)
+
+    #-- fit a Gaussian to peak
     popt_tot, pcov = curve_fit(_gaus, yi, ztot, p0=peak_guess)
-    ydata2 = ydata[np.where((ydata>=popt_tot[2] - popt_tot[3]*5.) &
-                            (ydata<=popt_tot[2] + popt_tot[3]*5.))]
+    #-- only allow data within a box around this peak
+    ydata2 = ydata[np.where((ydata>=popt_tot[2] - popt_tot[3]*bigbox) &
+                            (ydata<=popt_tot[2] + popt_tot[3]*bigbox))]
 
     yi = np.arange(img.shape[0])[ydata2]
     # define the X-bin edges
@@ -374,8 +392,12 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
         # if gaussian fits off chip, then use chip-integrated answer
         if (popt[2] <= min(ydata)+25) or (popt[2] >= max(ydata)-25):
             ybins[i] = popt_tot[2]
+            popt = popt_tot
         else:
             ybins[i] = popt[2]
+        # update the box it can search over, in case a big bend in the order
+        ydata2 = ydata[np.where((ydata>= popt[2] - popt[3]*bigbox) &
+                                (ydata<= popt[2] + popt[3]*bigbox))]
 
     # recenter the bin positions, trim the unused bin off in Y
     mxbins = (xbins[:-1]+xbins[1:]) / 2.
@@ -387,6 +409,15 @@ def ap_trace(img, fmask=(1,), nsteps=50, recenter=False, interac=False):
     # interpolate the spline to 1 position per column
     mx = np.arange(0,img.shape[1])
     my = ap_spl(mx)
+
+    if display is True:
+        plt.figure()
+        plt.imshow(np.log10(img),origin='lower',aspect='auto',cmap=cm.Greys_r)
+        plt.plot(mx,my,'b',lw=1)
+        # plt.plot(mx,my+popt_tot[3]*bigbox,'y')
+        # plt.plot(mx,my-popt_tot[3]*bigbox,'y')
+        plt.show()
+
     return my
 
 
@@ -1014,7 +1045,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='kpnoextinct.dat'):
     return obj_flux * airmass_ext
 
 
-def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5,
+def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
                display=False):
     """
 
@@ -1025,11 +1056,15 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5,
     stdstar : str
         Name of the standard star to use for flux calibration. Currently
         the IRAF library onedstds/spec50cal is used for flux calibration.
-        Assumes the first star in "speclist" is the standard star. If
-        nothing is entered for "stdstar", no flux calibration will be
-        computed. (Default is '')
+        If no standard is set, or an invalid standard is selected, will
+        return array of 1's and a warning.
     mode : str, optional
         either "linear", "spline", or "poly" (Default is spline)
+    polydeg : float, optional
+        set the order of the polynomial to fit through (Default is 9)
+    display : bool, optional
+        If True, plot the down-sampled sensfunc and fit to screen (Default
+        is False)
 
     Returns
     -------
@@ -1040,92 +1075,87 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=5,
     dir = os.path.dirname(os.path.realpath(__file__)) + \
           '/resources/onedstds/spec50cal/'
 
-    std_wave0, std_mag, std_wth = np.loadtxt(dir + stdstar2 + '.dat',
-                                            skiprows=1, unpack=True)
-    # standard star spectrum is stored in magnitude units
-    std_flux0 = _mag2flux(std_wave0, std_mag)
+    if os.path.isfile(dir + stdstar2):
+        std_wave, std_mag, std_wth = np.loadtxt(dir + stdstar2 + '.dat',
+                                                skiprows=1, unpack=True)
+        # standard star spectrum is stored in magnitude units
+        std_flux = _mag2flux(std_wave, std_mag)
 
-    #-- should we down-sample the template?
-    # std_wave = np.arange(np.nanmin(obj_wave), np.nanmax(obj_wave),
-    #                      np.mean(np.abs(std_wave0[1:]-std_wave0[:-1])))
-    # std_flux = np.interp(std_wave, std_wave0, std_flux0)
-    #-- or don't down-sample the template...
-    std_wave = std_wave0
-    std_flux = std_flux0
+        # Automatically exclude these obnoxious lines...
+        balmer = np.array([6563, 4861, 4341],dtype='float')
 
-    # maybe i'll automatically exclude these lines...
-    balmer = np.array([6563, 4861, 4341],dtype='float')
+        # down-sample (ds) the observed flux to the standard's bins
+        obj_flux_ds = []
+        obj_wave_ds = []
+        std_flux_ds = []
+        for i in range(len(std_wave)):
+            rng = np.where((obj_wave>=std_wave[i]) &
+                           (obj_wave<std_wave[i]+std_wth[i]) )
 
-    # down-sample (ds) the observed flux to the standard's bins
-    obj_flux_ds = []
-    obj_wave_ds = []
-    std_flux_ds = []
-    for i in range(len(std_wave)):
-        rng = np.where((obj_wave>=std_wave[i]) &
-                       (obj_wave<std_wave[i]+std_wth[i]) )
+            IsH = np.where((balmer>=std_wave[i]) &
+                           (balmer<std_wave[i]+std_wth[i]) )
 
-        IsH = np.where((balmer>=std_wave[i]) &
-                       (balmer<std_wave[i]+std_wth[i]) )
-
-        # does this bin contain observed spectra, and no Balmer line?
-        if (len(rng[0]) > 1) and (len(IsH[0]) == 0):
-            # obj_flux_ds.append(np.sum(obj_flux[rng]) / std_wth[i])
-            obj_flux_ds.append( np.mean(obj_flux[rng]) )
-            obj_wave_ds.append(std_wave[i])
-            std_flux_ds.append(std_flux[i])
+            # does this bin contain observed spectra, and no Balmer line?
+            if (len(rng[0]) > 1) and (len(IsH[0]) == 0):
+                # obj_flux_ds.append(np.sum(obj_flux[rng]) / std_wth[i])
+                obj_flux_ds.append( np.mean(obj_flux[rng]) )
+                obj_wave_ds.append(std_wave[i])
+                std_flux_ds.append(std_flux[i])
 
 
-    # the ratio between the standard star flux and observed flux
-    # has units like erg / counts
-    ratio = np.abs(np.array(std_flux_ds,dtype='float') /
-                   np.array(obj_flux_ds,dtype='float'))
-
-    # obj_wave_std = np.abs(obj_wave[1:]-obj_wave[:-1])
-    # obj_wave_std = np.append(obj_wave_std, obj_wave_std[-1])
+        # the ratio between the standard star flux and observed flux
+        # has units like erg / counts
+        ratio = np.abs(np.array(std_flux_ds,dtype='float') /
+                       np.array(obj_flux_ds,dtype='float'))
 
 
-    # interp calibration (sensfunc) on to object's wave grid
-    # can use 3 types of interpolations: linear, cubic spline, polynomial
-    # use linear interpolation for simplest answer
+        # interp calibration (sensfunc) on to object's wave grid
+        # can use 3 types of interpolations: linear, cubic spline, polynomial
 
-    if (mode != 'linear') and (mode != 'spline') and (mode != 'poly'):
-        mode = 'linear'
+        # if invalid mode selected, make it spline
+        if (mode != 'linear') and (mode != 'spline') and (mode != 'poly'):
+            mode = 'spline'
+            print("WARNING: invalid mode set in DefFluxCal. Changing to spline")
 
-    # actually fit the log of this sensfunc ratio
-    # since IRAF does the 2.5*log(ratio), everything in mag units!
-    LogSensfunc = np.log10(ratio)
+        # actually fit the log of this sensfunc ratio
+        # since IRAF does the 2.5*log(ratio), everything in mag units!
+        LogSensfunc = np.log10(ratio)
 
-    # interpolate back on to observed wavelength grid
-    if mode=='linear':
-        sensfunc2 = np.interp(obj_wave, obj_wave_ds, LogSensfunc)
-    elif mode=='spline':
-        spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.0025)
-        sensfunc2 = spl(obj_wave)
-    elif mode=='poly':
-        fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
-        sensfunc2 = np.polyval(fit, obj_wave)
+        # interpolate back on to observed wavelength grid
+        if mode=='linear':
+            sensfunc2 = np.interp(obj_wave, obj_wave_ds, LogSensfunc)
+        elif mode=='spline':
+            spl = UnivariateSpline(obj_wave_ds, LogSensfunc, ext=0, k=2 ,s=0.0025)
+            sensfunc2 = spl(obj_wave)
+        elif mode=='poly':
+            fit = np.polyfit(obj_wave_ds, LogSensfunc, polydeg)
+            sensfunc2 = np.polyval(fit, obj_wave)
 
-    if display is True:
-        plt.figure()
-        plt.plot(obj_wave, obj_flux,'k')
-        plt.plot(obj_wave_ds, obj_flux_ds,'bo')
-        plt.xlabel('Wavelength')
-        plt.ylabel('Observed Counts/S')
-        plt.show()
+        if display is True:
+            plt.figure()
+            plt.plot(obj_wave, obj_flux,'k')
+            plt.plot(obj_wave_ds, obj_flux_ds,'bo')
+            plt.xlabel('Wavelength')
+            plt.ylabel('Observed Counts/S')
+            plt.show()
 
-        plt.figure()
-        plt.plot(obj_wave_ds, LogSensfunc,'ko')
-        plt.plot(obj_wave, sensfunc2)
-        plt.xlabel('Wavelength')
-        plt.ylabel('log Sensfunc')
-        plt.show()
+            plt.figure()
+            plt.plot(obj_wave_ds, LogSensfunc,'ko')
+            plt.plot(obj_wave, sensfunc2)
+            plt.xlabel('Wavelength')
+            plt.ylabel('log Sensfunc')
+            plt.show()
 
-        plt.figure()
-        plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k')
-        plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
-        plt.xlabel('Wavelength')
-        plt.ylabel('Standard Star Flux')
-        plt.show()
+            plt.figure()
+            plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k')
+            plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
+            plt.xlabel('Wavelength')
+            plt.ylabel('Standard Star Flux')
+            plt.show()
+    else:
+        sensfunc2 = np.zeros_like(obj_wave)
+        print('ERROR: in DefFluxCal no valid standard star file found at ')
+        print(dir + stdstar2)
 
     return 10**sensfunc2
 
@@ -1149,7 +1179,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                trace1=False, ntracesteps=15,
                airmass_file='kpnoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
-               apwidth=8,skysep=3,skywidth=7, skydeg=0,
+               apwidth=8, skysep=3, skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=True,
                HeNeAr_tol=20, HeNeAr_order=3, displayHeNeAr=False,
                trim=True, write_reduced=True,
@@ -1163,7 +1193,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     4) trace spectral aperture
     5) extract spectrum
     6) measure sky along extracted spectrum
-    7) write output files
+    7) apply flux calibration
+    8) write output files
 
     Parameters
     ----------
@@ -1279,8 +1310,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         xbins = np.arange(data.shape[1])
         if display is True:
             plt.figure()
-            plt.imshow(np.log10(data), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
-            plt.colorbar()
+            plt.imshow(np.log10(data), origin='lower',aspect='auto',cmap=cm.Greys_r)
             plt.plot(xbins, trace,'b',lw=1)
             plt.plot(xbins, trace-apwidth,'r',lw=1)
             plt.plot(xbins, trace+apwidth,'r',lw=1)
@@ -1329,8 +1359,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             now = datetime.datetime.now()
 
             lout = open(spec+'.log','w')
-            lout.write('#  This file contains data on the reduction parameters \n'+
-                       '#  used for '+spec+'\n')
+            lout.write('#  This file contains the reduction parameters \n'+
+                       '#  used in autoreduce for '+spec+'\n')
             lout.write('DATE-REDUCED = '+str(now)+'\n')
             lout.write('HeNeAr_tol   = '+str(HeNeAr_tol)+'\n')
             lout.write('HeNeAr_order = '+str(HeNeAr_order)+'\n')

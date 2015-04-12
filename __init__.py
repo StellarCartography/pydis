@@ -1,4 +1,4 @@
-from .spectra import (OpenImg,ap_trace, ap_extract, HeNeAr_fit,
+from .spectra import (OpenImg, ap_trace, ap_extract, HeNeAr_fit,
                       mapwavelength, biascombine, flatcombine,
                       normalize, DefFluxCal, ApplyFluxCal, AirmassCor)
 

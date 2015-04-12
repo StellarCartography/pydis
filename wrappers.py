@@ -1,10 +1,16 @@
+'''
+This file contains useful wrappers for the primary reduction and analysis
+functions of SPECTRA. These helper routines enable painless reduction of,
+for example, an entire night of simple data (autoreduce).
+
+'''
+
 import spectra
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 
-######################
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace_recenter=False, trace_interac=True,
                trace1=False, ntracesteps=15,
@@ -224,8 +230,6 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     return
 
 
-
-
 def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
                stdstar='', trace1=False, ntracesteps=15,
                flat_mode='spline', flat_order=9, flat_response=True,
@@ -304,8 +308,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     return wfinal, ffinal, efinal
 
 
-
-def CoAddFinal(frames, mode='mean'):
+def CoAddFinal(frames, mode='mean', display=True):
     # co-add FINSIHED, reduced spectra
     # only trick: resample on to wavelength grid of 1st frame
     files = np.loadtxt(frames, dtype='string',unpack=True)
@@ -328,8 +331,11 @@ def CoAddFinal(frames, mode='mean'):
     if mode == 'median':
         flux_out = np.squeeze(np.median(flux_0, axis=2))
 
-    # plt.figure()
-    # plt.plot(wave_0, flux_out)
-    # plt.show()
+    if display is True:
+        plt.figure()
+        plt.plot(wave_0, flux_out)
+        plt.xlabel('Wavelength')
+        plt.ylabel('Co-Added Flux')
+        plt.show()
 
     return wave_0, flux_out

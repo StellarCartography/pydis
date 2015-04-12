@@ -15,19 +15,20 @@ e.g. DIS specifics:
 import matplotlib
 matplotlib.use('TkAgg')
 
-from astropy.io import fits
+import os
 import numpy as np
-import matplotlib.pyplot as plt
+import scipy.signal
 import matplotlib.cm as cm
+from astropy.io import fits
+import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from matplotlib.widgets import Cursor
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
 from astropy.convolution import convolve, Box1DKernel
-import scipy.signal
-import datetime
-import os
-from matplotlib.widgets import Cursor
-from matplotlib.widgets import SpanSelector
+
+# import datetime
+# from matplotlib.widgets import SpanSelector
 
 
 
@@ -522,7 +523,8 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
 
 def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                trim=True, fmask=(1,), display=True,
-               tol=10, fit_order=2, previous='',mode='poly'):
+               tol=10, fit_order=2, previous='',mode='poly',
+               second_pass=True):
     """
     Determine the wavelength solution to be used for the science images.
     Can be done either automatically (buyer beware) or manually. Both the
@@ -559,6 +561,9 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         When in automatic mode, the tolerance in pixel units between
         linelist entries and estimated wavelengths for the first few
         lines matched... use carefully. (Default is 10)
+    mode : str, optional
+        What type of function to use to fit the entire 2D wavelength
+        solution? Options include (poly, spline2d). (Default is poly)
     fit_order : int, optional
         The polynomial order to use to interpolate between identified
         peaks in the HeNeAr (Default is 2)
@@ -568,11 +573,12 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
     Returns
     -------
-    wfit : bivariate spline object
-        The wavelength evaluated at every pixel
+    wfit : bivariate spline object or 2d polynomial
+        The wavelength solution at every pixel. Output type depends on the
+        mode keyword above (poly is recommended)
     """
 
-    print('Running HeNeAr_fit function.')
+    print('Running HeNeAr_fit function on file '+calimage)
 
     hdu = fits.open(calimage)
     if trim is False:
@@ -600,7 +606,10 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
+
     ######   IDENTIFY   (auto and interac modes)
+    # = = = = = = = = = = = = = = = =
+    #-- automatic mode
     if (interac is False) and (len(previous)==0):
         print("Doing automatic wavelength calibration on HeNeAr.")
         print("Note, this is not very robust. Suggest you re-run with interac=True")
@@ -710,6 +719,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
 
     # = = = = = = = = = = = = = = = =
+    #-- manual (interactive) mode
     elif (interac is True):
         if (len(previous)==0):
             print('')
@@ -875,7 +885,71 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
 
     # = = = = = = = = = = = = = = = = = =
-    # now wavelength is found, either via interactive or auto mode!
+    # now rough wavelength is found, either via interactive or auto mode!
+
+    #-- SECOND PASS
+    if second_pass is True:
+        dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+        hireslinelist = 'henear.dat'
+        linewave2 = np.loadtxt(dir + hireslinelist, dtype='float',
+                               skiprows=1, usecols=(0,), unpack=True)
+
+        # use a lower flux threshold to go after smaller ampl peaks
+        flux_thresh2 = np.percentile(slice, 90)
+        high2 = np.where( (slice >= flux_thresh2) )
+        pk2 = high2[0][ ( (high2[0][1:]-high2[0][:-1]) > 1 ) ]
+
+        pwidth = 10
+        tol2 = tol/2.0
+        pk2 = pk2[pk2 > pwidth]
+        pk2 = pk2[pk2 < (len(slice)-pwidth)]
+        print('Found '+str(len(pk2))+' peaks in HeNeAr to take 2nd pass fit over')
+
+        pcent_pix2 = np.zeros_like(pk2,dtype='float')
+        wcent_pix2 = np.zeros_like(pk2,dtype='float')
+        # for each peak, fit a gaussian to find center
+        for i in range(len(pk2)):
+            xi = wtemp[pk2[i]-pwidth:pk2[i]+pwidth*2]
+            yi = slice[pk2[i]-pwidth:pk2[i]+pwidth*2]
+
+            pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
+            popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
+                                  p0=pguess)
+
+            # the gaussian center of the line in pixel units
+            pcent_pix2[i] = (pk2[i]-pwidth) + popt[2]
+            # and the peak in wavelength units
+            wcent_pix2[i] = xi[np.nanargmax(yi)]
+        pcent2 = []
+        wcent2 = []
+        ss = np.argsort(np.abs(wcent_pix2-wcen_approx))
+
+        # coeff should be set by either manual or interac mode above
+        # coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
+        for i in range(len(pcent_pix2)):
+            xx = pcent_pix2-len(slice)/2
+            wcent_pix2 = np.polyval(coeff, xx)
+            if display is True:
+                plt.figure()
+                plt.plot(wtemp, slice, 'b')
+                plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
+                plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
+                plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
+
+            if (min((np.abs(wcent_pix2[ss][i] - linewave2))) < tol2):
+                # add corresponding pixel and *actual* wavelength to output vectors
+                pcent2 = np.append(pcent2,pcent_pix2[ss[i]])
+                wcent2 = np.append(wcent2, linewave2[np.argmin(np.abs(wcent_pix2[ss[i]] - linewave2))] )
+                if display is True:
+                    plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
+                if (len(pcent2)>fit_order):
+                    coeff = np.polyfit(pcent2-len(slice)/2, wcent2, fit_order)
+            if display is True:
+                plt.xlim((min(wtemp),max(wtemp)))
+                plt.show()
+        wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+
+
 
     #-- trace the peaks vertically
     # how far can the trace be bent, i.e. how big a window to fit over?
@@ -1173,6 +1247,3 @@ def ApplyFluxCal(obj_wave, obj_flux, obj_err, cal_wave, sensfunc):
 
     # then simply apply re-sampled sensfunc to target flux
     return obj_flux * sensfunc2, obj_err * sensfunc2
-
-
-###

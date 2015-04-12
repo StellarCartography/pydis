@@ -1,5 +1,6 @@
 from .spectra import (OpenImg,ap_trace, ap_extract, HeNeAr_fit,
-                      mapwavelength, biascombine, flatcombine, autoreduce,
-                      normalize, DefFluxCal, ApplyFluxCal, AirmassCor,
-                      CoAddFinal, ReduceCoAdd)
+                      mapwavelength, biascombine, flatcombine,
+                      normalize, DefFluxCal, ApplyFluxCal, AirmassCor)
 
+
+from .wrappers import (autoreduce, CoAddFinal, ReduceCoAdd)

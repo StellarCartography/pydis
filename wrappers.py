@@ -9,6 +9,7 @@ import spectra
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import datetime
 
 
 def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
@@ -18,7 +19,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8, skysep=3, skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=True,
-               HeNeAr_tol=20, HeNeAr_order=3, displayHeNeAr=False,
+               HeNeAr_tol=20, HeNeAr_order=3, display_HeNeAr=False,
                trim=True, write_reduced=True,
                display=True, display_final=True):
     """
@@ -83,7 +84,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     HeNeAr_order : int, optional
         The polynomial order to use to interpolate between identified
         peaks in the HeNeAr (Default is 2)
-    displayHeNeAr : bool, optional
+    display_HeNeAr : bool, optional
     trim : bool, optional
         Trim the image using the DATASEC keyword in the header, assuming
         has format of [0:1024,0:512] (Default is True)
@@ -114,7 +115,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     # do the HeNeAr mapping first, must apply to all science frames
     wfit = spectra.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
                       previous=prev,mode='poly',
-                      display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
+                      display=display_HeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
 
     # read in the list of target spectra
@@ -193,7 +194,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         if write_reduced is True:
             spectra._WriteSpec(spec, wfinal, ffinal, efinal, trace)
 
-            now = spectra.datetime.datetime.now()
+            now = datetime.datetime.now()
 
             lout = open(spec+'.log','w')
             lout.write('#  This file contains the reduction parameters \n'+

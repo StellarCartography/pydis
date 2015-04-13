@@ -713,6 +713,12 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                 plt.xlim((min(wtemp),max(wtemp)))
                 plt.show()
 
+        lout = open(calimage+'.lines', 'w')
+        lout.write("# This file contains the HeNeAr lines identified [auto] Columns: (pixel, wavelength) \n")
+        for l in range(len(pcent)):
+            lout.write(str(pcent[l]) + ', ' + str(wcent[l])+'\n')
+        lout.close()
+
         # the end result is the vector "coeff" has the wavelength solution for "slice"
         # update the "wtemp" vector that goes with "slice" (fluxes)
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
@@ -837,7 +843,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
             print('> You have identified '+str(len(pcent))+' lines')
             lout = open(calimage+'.lines', 'w')
-            lout.write("# This file contains the HeNeAr lines manually identified. Columns: (pixel, wavelength) \n")
+            lout.write("# This file contains the HeNeAr lines identified [manual] Columns: (pixel, wavelength) \n")
             for l in range(len(pcent)):
                 lout.write(str(pcent[l]) + ', ' + str(wcent[l])+'\n')
             lout.close()
@@ -881,7 +887,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             plt.show()
 
             print(' ')
-            done = str(raw_input('d/#: '))
+            done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
 
 
     # = = = = = = = = = = = = = = = = = =
@@ -895,12 +901,13 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                                skiprows=1, usecols=(0,), unpack=True)
 
         # use a lower flux threshold to go after smaller ampl peaks
-        flux_thresh2 = np.percentile(slice, 90)
+        flux_thresh2 = np.percentile(slice, 80)
+        pwidth = 10
+        tol2 = tol # / 2.0
+
         high2 = np.where( (slice >= flux_thresh2) )
         pk2 = high2[0][ ( (high2[0][1:]-high2[0][:-1]) > 1 ) ]
 
-        pwidth = 10
-        tol2 = tol/2.0
         pk2 = pk2[pk2 > pwidth]
         pk2 = pk2[pk2 < (len(slice)-pwidth)]
         print('Found '+str(len(pk2))+' peaks in HeNeAr to take 2nd pass fit over')
@@ -913,18 +920,28 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             yi = slice[pk2[i]-pwidth:pk2[i]+pwidth*2]
 
             pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-            popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
-                                  p0=pguess)
+            try:
+                popt,pcov = curve_fit(_gaus, np.arange(len(xi), dtype='float'),
+                                      yi, p0=pguess)
+                # the gaussian center of the line in pixel units
+                pcent_pix2[i] = (pk2[i]-pwidth) + popt[2]
+                # and the peak in wavelength units
+                wcent_pix2[i] = xi[np.nanargmax(yi)]
+            except RuntimeError:
+                pcent_pix2[i] = -9999
+                wcent_pix2[i] = -9999
 
-            # the gaussian center of the line in pixel units
-            pcent_pix2[i] = (pk2[i]-pwidth) + popt[2]
-            # and the peak in wavelength units
-            wcent_pix2[i] = xi[np.nanargmax(yi)]
+        # remove points w/ bad fits
+        ok = np.where((pcent_pix2 > -9999))
+        pcent_pix2 = pcent_pix2[ok]
+        wcent_pix2 = wcent_pix2[ok]
+
         pcent2 = []
         wcent2 = []
+        # sort from center wavelength out
         ss = np.argsort(np.abs(wcent_pix2-wcen_approx))
 
-        # coeff should be set by either manual or interac mode above
+        # coeff should already be set by manual or interac mode above
         # coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
         for i in range(len(pcent_pix2)):
             xx = pcent_pix2-len(slice)/2
@@ -932,24 +949,73 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             if display is True:
                 plt.figure()
                 plt.plot(wtemp, slice, 'b')
-                plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
-                plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
-                plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
+                plt.scatter(linewave2,np.ones_like(linewave2)*np.nanmax(slice),
+                            marker='o',c='cyan')
+                plt.scatter(wcent_pix2,np.ones_like(wcent_pix2)*np.nanmax(slice)/2.,
+                            marker='*',c='green')
+                plt.scatter(wcent_pix2[ss[i]],np.nanmax(slice)/2.,
+                            marker='o',c='orange')
+                plt.text(np.nanmin(wcent_pix2), np.nanmax(slice)*0.95, hireslinelist)
+                plt.text(np.nanmin(wcent_pix2), np.nanmax(slice)/2.*1.1, 'detected lines')
 
             if (min((np.abs(wcent_pix2[ss][i] - linewave2))) < tol2):
                 # add corresponding pixel and *actual* wavelength to output vectors
-                pcent2 = np.append(pcent2,pcent_pix2[ss[i]])
+                pcent2 = np.append(pcent2, pcent_pix2[ss[i]])
                 wcent2 = np.append(wcent2, linewave2[np.argmin(np.abs(wcent_pix2[ss[i]] - linewave2))] )
-                if display is True:
-                    plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
-                if (len(pcent2)>fit_order):
-                    coeff = np.polyfit(pcent2-len(slice)/2, wcent2, fit_order)
+
+                #-- update in real time. maybe not good for 2nd pass
+                # if (len(pcent2)>fit_order):
+                #     coeff = np.polyfit(pcent2-len(slice)/2, wcent2, fit_order)
+
             if display is True:
+                plt.scatter(wcent2,np.ones_like(wcent2)*np.nanmax(slice)*1.05,marker='o',c='red')
+                plt.text(np.nanmin(wcent_pix2), np.nanmax(slice)*1.1, 'matched lines')
+
+            if display is True:
+                plt.ylim((np.nanmin(slice), np.nanmax(slice)*1.2))
                 plt.xlim((min(wtemp),max(wtemp)))
                 plt.show()
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
+        lout = open(calimage+'.lines', 'w')
+        lout.write("# This file contains the HeNeAr lines identified [2nd pass] Columns: (pixel, wavelength) \n")
+        for l in range(len(pcent2)):
+            lout.write(str(pcent2[l]) + ', ' + str(wcent2[l])+'\n')
+        lout.close()
 
+        xpix = np.arange(len(slice))
+        coeff = np.polyfit(pcent2, wcent2, fit_order)
+        wtemp = np.polyval(coeff, xpix)
+
+        if interac is True:
+            done = str(fit_order)
+            while (done != 'd'):
+                fit_order = int(done)
+                coeff = np.polyfit(pcent2, wcent2, fit_order)
+                wtemp = np.polyval(coeff, xpix)
+
+                fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+                ax1.plot(pcent2, wcent2, 'bo')
+                ax1.plot(xpix, wtemp, 'r')
+
+                ax2.plot(pcent2, wcent2 - np.polyval(coeff, pcent2),'ro')
+                ax2.set_xlabel('pixel')
+                ax1.set_ylabel('wavelength')
+                ax2.set_ylabel('residual')
+                ax1.set_title('2nd pass, fit_order = '+str(fit_order))
+
+                # ylabel('wavelength')
+
+                print(" ")
+                print('> How does this look?  Enter "d" to be done (accept), ')
+                print('  or a number to change the polynomial order and re-fit')
+                print('> Currently fit_order = '+str(fit_order))
+                print(" ")
+
+                plt.show()
+
+                print(' ')
+                done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
 
     #-- trace the peaks vertically
     # how far can the trace be bent, i.e. how big a window to fit over?

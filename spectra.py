@@ -14,18 +14,17 @@ e.g. DIS specifics:
 
 import matplotlib
 matplotlib.use('TkAgg')
-
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from matplotlib.widgets import Cursor
 import os
 import numpy as np
-import scipy.signal
-import matplotlib.cm as cm
 from astropy.io import fits
-import matplotlib.pyplot as plt
+from astropy.convolution import convolve, Box1DKernel
 from scipy.optimize import curve_fit
-from matplotlib.widgets import Cursor
+import scipy.signal
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
-from astropy.convolution import convolve, Box1DKernel
 
 # import datetime
 # from matplotlib.widgets import SpanSelector

@@ -97,7 +97,7 @@ def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
     fout = open(spec+'.spec','w')
     fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
     for k in range(len(wfinal)):
-        fout.write(str(wfinal[k]) + ', ' + str(ffinal[k]) + ', ' + str(efinal[k]) + '\n')
+        fout.write(str(wfinal[k]) + '  ' + str(ffinal[k]) + '  ' + str(efinal[k]) + '\n')
     fout.close()
     return
 

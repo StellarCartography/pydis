@@ -1148,7 +1148,7 @@ def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
     return
 
 
-def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='kpnoextinct.dat'):
+def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     """
     Correct the spectrum based on the airmass
 
@@ -1164,7 +1164,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='kpnoextinct.dat'):
         The name of the airmass extinction file. This routine assumes
         the file is stored in the resources/ subdirectory. Available files
         are: apoextinct.dat, kpnoextinct.dat, ctioextinct.dat
-        (Default is kpnoextinct.dat)
+        (Default is apoextinct.dat)
 
     Returns
     -------

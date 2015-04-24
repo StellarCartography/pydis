@@ -1136,15 +1136,49 @@ def mapwavelength(trace, wavemap, mode='poly'):
     return trace_wave
 
 
-def normalize(wave, flux, spline=False, poly=True, order=3, interac=True):
-    # not yet
-    if (poly is False) and (spline is False):
-        poly=True
+def normalize(wave, flux, mode='poly', order=3):
+    '''
+    Return a flattened, normalized spectrum. A model spectrum is made of
+    the continuum by fitting either a polynomial or spline to the data,
+    and then the data is normalized with the equation:
+    >>> norm = (flux - model) / model
 
-    if (poly is True):
-        print("yes")
 
-    return
+    Parameters
+    ----------
+    wave : 1-d array
+        The object's wavelength array
+    flux : 1-d array
+        The object's flux array
+    mode : str, optional
+        Decides which mode should be used to flatten the spectrum.
+        Options are 'poly' (Default), 'spline', 'interac'.
+    order : int, optional
+        The polynomial order to use for mode='poly'. (Default is 3)
+
+    Returns
+    -------
+    Flux normalized spectrum at same wavelength points as the input
+    '''
+
+    if (mode != 'interac') and (mode != 'spline') and (mode != 'poly'):
+        mode = 'poly'
+        print("WARNING: invalid mode set in normalize. Changing to 'poly'")
+
+    if mode=='interac':
+        print('interac mode not built yet. sorry...')
+        mode = 'poly'
+
+    if mode=='poly':
+        fit = np.polyfit(wave, flux, order)
+        model = np.polyval(fit, wave)
+
+    if mode=='spline':
+        spl = UnivariateSpline(wave, flux, ext=0, k=2 ,s=0.0025)
+        model = spl(wave)
+
+    norm = (flux - model) / model
+    return norm
 
 
 def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):

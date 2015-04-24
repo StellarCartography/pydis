@@ -521,7 +521,7 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
 
 
 def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
-               trim=True, fmask=(1,), display=True,
+               trim=True, fmask=(1,), display=False,
                tol=10, fit_order=2, previous='',mode='poly',
                second_pass=True):
     """
@@ -945,6 +945,16 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         for i in range(len(pcent_pix2)):
             xx = pcent_pix2-len(slice)/2
             wcent_pix2 = np.polyval(coeff, xx)
+
+            if (min((np.abs(wcent_pix2[ss][i] - linewave2))) < tol2):
+                # add corresponding pixel and *actual* wavelength to output vectors
+                pcent2 = np.append(pcent2, pcent_pix2[ss[i]])
+                wcent2 = np.append(wcent2, linewave2[np.argmin(np.abs(wcent_pix2[ss[i]] - linewave2))] )
+
+            #-- update in real time. maybe not good for 2nd pass
+            # if (len(pcent2)>fit_order):
+            #     coeff = np.polyfit(pcent2-len(slice)/2, wcent2, fit_order)
+
             if display is True:
                 plt.figure()
                 plt.plot(wtemp, slice, 'b')
@@ -957,26 +967,15 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                 plt.text(np.nanmin(wcent_pix2), np.nanmax(slice)*0.95, hireslinelist)
                 plt.text(np.nanmin(wcent_pix2), np.nanmax(slice)/2.*1.1, 'detected lines')
 
-            if (min((np.abs(wcent_pix2[ss][i] - linewave2))) < tol2):
-                # add corresponding pixel and *actual* wavelength to output vectors
-                pcent2 = np.append(pcent2, pcent_pix2[ss[i]])
-                wcent2 = np.append(wcent2, linewave2[np.argmin(np.abs(wcent_pix2[ss[i]] - linewave2))] )
-
-                #-- update in real time. maybe not good for 2nd pass
-                # if (len(pcent2)>fit_order):
-                #     coeff = np.polyfit(pcent2-len(slice)/2, wcent2, fit_order)
-
-            if display is True:
                 plt.scatter(wcent2,np.ones_like(wcent2)*np.nanmax(slice)*1.05,marker='o',c='red')
                 plt.text(np.nanmin(wcent_pix2), np.nanmax(slice)*1.1, 'matched lines')
 
-            if display is True:
                 plt.ylim((np.nanmin(slice), np.nanmax(slice)*1.2))
                 plt.xlim((min(wtemp),max(wtemp)))
                 plt.show()
         wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
 
-        lout = open(calimage+'.lines', 'w')
+        lout = open(calimage+'.lines2', 'w')
         lout.write("# This file contains the HeNeAr lines identified [2nd pass] Columns: (pixel, wavelength) \n")
         for l in range(len(pcent2)):
             lout.write(str(pcent2[l]) + ', ' + str(wcent2[l])+'\n')

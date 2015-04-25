@@ -1,11 +1,11 @@
 '''
 This file contains useful wrappers for the primary reduction and analysis
-functions of SPECTRA. These helper routines enable painless reduction of,
+functions of pyDIS. These helper routines enable painless reduction of,
 for example, an entire night of simple data (autoreduce).
 
 '''
 
-import spectra
+import pydis
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -104,8 +104,8 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     """
 
     # assume specfile is a list of file names of object
-    bias = spectra.biascombine(biaslist, trim=trim)
-    flat,fmask_out = spectra.flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
+    bias = pydis.biascombine(biaslist, trim=trim)
+    flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
                                  flat_poly=flat_order, response=flat_response)
 
     if HeNeAr_prev is False:
@@ -113,7 +113,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     else:
         prev = HeNeAr_file+'.lines'
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = spectra.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
+    wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
                       previous=prev,mode='poly',
                       display=display_HeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
@@ -124,7 +124,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
     for i in range(len(specfile)):
         spec = specfile[i]
         print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
-        raw, exptime, airmass = spectra.OpenImg(spec, trim=trim)
+        raw, exptime, airmass = pydis.OpenImg(spec, trim=trim)
 
         # remove bias and flat, divide by exptime
         data = ((raw - bias) / flat) / exptime
@@ -137,11 +137,11 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
         # with reduced data, trace the aperture
         if (i==0) or (trace1 is False):
-            trace = spectra.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+            trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
                              recenter=trace_recenter, interac=trace_interac)
 
         # extract the spectrum, measure sky values along trace, get flux errors
-        ext_spec, sky, fluxerr = spectra.ap_extract(data, trace, apwidth=apwidth,
+        ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
                                             skysep=skysep,skywidth=skywidth,
                                             skydeg=skydeg,coaddN=1)
 
@@ -161,7 +161,7 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.show()
 
 
-        wfinal = spectra.mapwavelength(trace, wfit, mode='poly')
+        wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
 
         # plt.figure()
         # plt.plot(wfinal,'r')
@@ -172,13 +172,13 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
         flux_red = (ext_spec - sky)
 
         # now correct the spectrum for airmass extinction
-        flux_red_x = spectra.AirmassCor(wfinal, flux_red, airmass,
+        flux_red_x = pydis.AirmassCor(wfinal, flux_red, airmass,
                                 airmass_file=airmass_file)
 
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!
         if (len(stdstar) > 0) and (i==0):
-            sens_flux = spectra.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+            sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
                                    mode='spline',polydeg=12)
             sens_wave = wfinal
 
@@ -188,11 +188,11 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             sens_wave = wfinal
 
         # final step in reduction, apply sensfunc
-        ffinal,efinal = spectra.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
+        ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
 
         if write_reduced is True:
-            spectra._WriteSpec(spec, wfinal, ffinal, efinal, trace)
+            pydis._WriteSpec(spec, wfinal, ffinal, efinal, trace)
 
             now = datetime.datetime.now()
 
@@ -250,40 +250,40 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
 
     """
     #-- the basic crap, used for all frames
-    bias = spectra.biascombine(biaslist, trim=trim)
-    flat,fmask_out = spectra.flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
+    bias = pydis.biascombine(biaslist, trim=trim)
+    flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
                                  flat_poly=flat_order, response=flat_response)
     if HeNeAr_prev is False:
         prev = ''
     else:
         prev = HeNeAr_file+'.lines'
-    wfit = spectra.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
+    wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
                       previous=prev,mode='poly',
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
     #-- the standard star, set the stage
     specfile = np.loadtxt(speclist,dtype='string')
     spec = specfile[0]
-    raw, exptime, airmass = spectra.OpenImg(spec, trim=trim)
+    raw, exptime, airmass = pydis.OpenImg(spec, trim=trim)
     data = ((raw - bias) / flat) / exptime
 
-    trace = spectra.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
+    trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
     # extract the spectrum, measure sky values along trace, get flux errors
-    ext_spec, sky, fluxerr = spectra.ap_extract(data, trace, apwidth=apwidth,
+    ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
                                         skysep=skysep,skywidth=skywidth,
                                         skydeg=skydeg,coaddN=1)
     xbins = np.arange(data.shape[1])
-    wfinal = spectra.mapwavelength(trace, wfit, mode='poly')
+    wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
-    sens_flux = spectra.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+    sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
                            mode='spline',polydeg=12)
     sens_wave = wfinal
-    ffinal,efinal = spectra.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
+    ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
     #-- the target star exposures, stack and proceed
     for i in range(1,len(specfile)):
         spec = specfile[i]
-        raw, exptime, airmass = spectra.OpenImg(spec, trim=trim)
+        raw, exptime, airmass = pydis.OpenImg(spec, trim=trim)
         data_i = ((raw - bias) / flat) / exptime
         if (i==1):
             all_data = data_i
@@ -291,13 +291,13 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
             all_data = np.dstack( (all_data, data_i))
     data = np.median(all_data, axis=2)
     # extract the spectrum, measure sky values along trace, get flux errors
-    ext_spec, sky, fluxerr = spectra.ap_extract(data, trace, apwidth=apwidth,
+    ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
                                         skysep=skysep,skywidth=skywidth,
                                         skydeg=skydeg,coaddN=len(specfile))
     xbins = np.arange(data.shape[1])
-    wfinal = spectra.mapwavelength(trace, wfit, mode='poly')
+    wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
-    ffinal,efinal = spectra.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
+    ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
     plt.figure()
     plt.plot(wfinal, ffinal)

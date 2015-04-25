@@ -44,6 +44,23 @@ def _gaus(x,a,b,x0,sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
 
 
+def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
+    # write file with the trace (y positions)
+    tout = open(spec+'.trace','w')
+    tout.write('#  This file contains the x,y coordinates of the trace \n')
+    for k in range(len(trace)):
+        tout.write(str(k)+', '+str(trace[k]) + '\n')
+    tout.close()
+
+    # write the final spectrum out
+    fout = open(spec+'.spec','w')
+    fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
+    for k in range(len(wfinal)):
+        fout.write(str(wfinal[k]) + '  ' + str(ffinal[k]) + '  ' + str(efinal[k]) + '\n')
+    fout.close()
+    return
+
+
 def OpenImg(file, trim=True):
     """
     A simple wrapper for astropy.io.fits (pyfits) to open and extract
@@ -83,23 +100,6 @@ def OpenImg(file, trim=True):
     exptime = hdu[0].header['EXPTIME']
     hdu.close(closed=True)
     return raw, exptime, airmass
-
-
-def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
-    # write file with the trace (y positions)
-    tout = open(spec+'.trace','w')
-    tout.write('#  This file contains the x,y coordinates of the trace \n')
-    for k in range(len(trace)):
-        tout.write(str(k)+', '+str(trace[k]) + '\n')
-    tout.close()
-
-    # write the final spectrum out
-    fout = open(spec+'.spec','w')
-    fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
-    for k in range(len(wfinal)):
-        fout.write(str(wfinal[k]) + '  ' + str(ffinal[k]) + '  ' + str(efinal[k]) + '\n')
-    fout.close()
-    return
 
 
 def biascombine(biaslist, output='BIAS.fits', trim=True):
@@ -268,7 +268,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
     return flat ,ok[0]
 
 
-def ap_trace(img, fmask=(1,), nsteps=50, interac=False,
+def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
              recenter=False, prevtrace=(0,), bigbox=15, display=True):
     """
     Trace the spectrum aperture in an image
@@ -1136,7 +1136,7 @@ def mapwavelength(trace, wavemap, mode='poly'):
     return trace_wave
 
 
-def normalize(wave, flux, mode='poly', order=3):
+def normalize(wave, flux, mode='poly', order=5):
     '''
     Return a flattened, normalized spectrum. A model spectrum is made of
     the continuum by fitting either a polynomial or spline to the data,

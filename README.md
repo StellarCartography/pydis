@@ -1,10 +1,13 @@
-# *SPECTRA*
-A simple reduction package for one dimensional longslit spectroscopy using Python. Also colloqiually known as "pyDIS", as it was designed for DIS
+# *pyDIS*
+An easy to use reduction package for one dimensional longslit spectroscopy using Python. 
 
-The goal of *SPECTRA* is to provide a turn-key solution for reducing and understanding longslit spectroscopy, which could ideally be done in real time. Currently we are using many simple assumptions to get a quick-and-dirty solution, and modeling the workflow after the robust industry standards set by IRAF. Additionally, we have only used data from the low/medium resolution [APO 3.5-m](http://www.apo.nmsu.edu) "Dual Imaging Spectrograph" (DIS). Therefore, many instrument specific assumptions are being made.
+The goal of *pyDIS* is to provide a turn-key solution for reducing and understanding longslit spectroscopy, which could ideally be done in real time. Currently we are using many simple assumptions to get a quick-and-dirty solution, and modeling the workflow after the robust industry standards set by IRAF. Additionally, we have only used data from the low/medium resolution [APO 3.5-m](http://www.apo.nmsu.edu) "Dual Imaging Spectrograph" (DIS). Therefore, many instrument specific assumptions are being made.
+
+Some more background on this package is [given here](http://jradavenport.github.io/2015/04/01/spectra.html).
+
 
 ## Examples
-See the [examples page](https://github.com/jradavenport/spectra/wiki/Examples) on the Wiki for a few worked examples of reducing DIS data, or the step-by-step [manual reduction guide](https://github.com/jradavenport/spectra/wiki/Manual-Reduction-Guide) for a detailed tutorial on reducing 1-d spectroscopy data with *SPECTRA*.
+See the [examples page](https://github.com/jradavenport/pydis/wiki/Examples) on the Wiki for a few worked examples of reducing DIS data, or the step-by-step [manual reduction guide](https://github.com/jradavenport/pydis/wiki/Manual-Reduction-Guide) for a detailed tutorial on reducing 1-d spectroscopy data with *pyDIS*.
 
 
 ## Motivation
@@ -24,7 +27,7 @@ Really slick tools exist for on-the-fly photometry analysis. However, no turn-ke
 - The more hands-free the better, a full reduction script needs to be available
 - A fully interactive mode (a la IRAF) should be available for each task
 
-So far SPECTRA can do a rough job of all the reduction tasks for single point sources objects! We are seeking more data to test it against, to help refine the solution and find bugs. Here is one example of a **totally hands-free reduced M dwarf spectrum** versus the manual IRAF reduction:
+So far *pyDIS* can do a rough job of all the reduction tasks for single point sources objects! We are seeking more data to test it against, to help refine the solution and find bugs. Here is one example of a **totally hands-free reduced M dwarf spectrum** versus the manual IRAF reduction:
 
 ![Imgur](http://i.imgur.com/4Y55NZHl.png)
 

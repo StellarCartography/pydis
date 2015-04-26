@@ -61,13 +61,33 @@ def _BuildLineDict(linelist='henear.dat'):
 
     Goal is to do this once, store it in some hard file form for users.
     Users then would only re-run this function if linelist changed, say if
-    a different set of lamps were used. Thus, these method should be
-    chemically agnostic!
+    a different set of lamps were used.
     '''
 
     dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
 
-    linewave2 = np.loadtxt(dir + linelist, dtype='float',
+    linewave = np.loadtxt(dir + linelist, dtype='float',
                            skiprows=1, usecols=(0,), unpack=True)
 
-    # go from blue to red, build huge list of triangles
+    # go from blue to red, build list of triangles
+    # do Nlines - 2 "triangles", 1 pass thru data w/ adjacent lines only
+    # build dict of triangle side ratios
+    d = {}
+    ntri = len(linewave)-2
+    for k in range(ntri):
+        # the 3 lines
+        l1,l2,l3 = linewave[k:k+3]
+        # the 3 "sides", ratios of the line separations
+        s1 = abs( (l1-l3) / (l1-l2) )
+        s2 = abs( (l1-l2) / (l2-l3) )
+        s3 = abs( (l1-l3) / (l2-l3) )
+
+        sides = [s1,s2,s3]
+        lines = [l1,l2,l3]
+        ss = np.argsort(sides)
+
+        d.update({(sides[ss[0]], sides[ss[1]], sides[ss[2]]):
+                      (lines[ss[0]], lines[ss[1]], lines[ss[2]])})
+
+    # now, how to save this dict? or should we just return it?
+    return d

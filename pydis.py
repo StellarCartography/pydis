@@ -1228,10 +1228,13 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     obj_wave : 1-d array
     obj_flux : 1-d array
     stdstar : str
-        Name of the standard star to use for flux calibration. Currently
-        the IRAF library onedstds/spec50cal is used for flux calibration.
+        Name of the standard star file to use for flux calibration. You
+        must give the subdirectory and file name, for example:
+        >>> sensfunc = DefFluxCal(wave, flux, mode='spline',
+        >>>                       stdstar='spec50cal/feige34.dat')
         If no standard is set, or an invalid standard is selected, will
-        return array of 1's and a warning.
+        return array of 1's and a warning. A list of all available
+        subdirectories and objects is available on the wiki.
     mode : str, optional
         either "linear", "spline", or "poly" (Default is spline)
     polydeg : float, optional
@@ -1247,10 +1250,10 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     """
     stdstar2 = stdstar.lower()
     dir = os.path.dirname(os.path.realpath(__file__)) + \
-          '/resources/onedstds/spec50cal/'
+          '/resources/onedstds/'
 
-    if os.path.isfile(dir + stdstar2+'.dat'):
-        std_wave, std_mag, std_wth = np.loadtxt(dir + stdstar2 + '.dat',
+    if os.path.isfile(dir + stdstar2):
+        std_wave, std_mag, std_wth = np.loadtxt(dir + stdstar2,
                                                 skiprows=1, unpack=True)
         # standard star spectrum is stored in magnitude units
         std_flux = _mag2flux(std_wave, std_mag)

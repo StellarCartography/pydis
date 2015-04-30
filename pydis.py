@@ -1234,7 +1234,8 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
         >>>                       stdstar='spec50cal/feige34.dat')
         If no standard is set, or an invalid standard is selected, will
         return array of 1's and a warning. A list of all available
-        subdirectories and objects is available on the wiki.
+        subdirectories and objects is available on the wiki, or look in
+        pydis/resources/onedstds/
     mode : str, optional
         either "linear", "spline", or "poly" (Default is spline)
     polydeg : float, optional

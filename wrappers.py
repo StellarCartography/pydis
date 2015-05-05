@@ -15,7 +15,7 @@ import datetime
 def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                stdstar='', trace_recenter=False, trace_interac=True,
                trace1=False, ntracesteps=15,
-               airmass_file='kpnoextinct.dat',
+               airmass_file='apoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8, skysep=3, skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=True,

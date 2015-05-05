@@ -39,6 +39,7 @@ def _mag2flux(wave, mag, zeropt=48.60):
     flux = 10.0**( (mag + zeropt) / (-2.5) )
     return flux * (c / wave**2.0)
 
+
 def _gaus(x,a,b,x0,sigma):
     """ Simple Gaussian function, for internal use only """
     return a*np.exp(-(x-x0)**2/(2*sigma**2))+b

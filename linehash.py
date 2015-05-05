@@ -7,11 +7,42 @@ Goal: clumsy, slow, effective
 '''
 
 
-# import pydis
+import pydis
 from astropy.io import fits
 import numpy as np
 import os
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+
+
+
+def _MakeTris(linewave0):
+    '''
+
+    :param linewave0:
+    :return:
+    '''
+    linewave = linewave0.copy()
+    linewave.sort()
+
+    # might want to change this to some kind of numpy array, not dict...
+    d = {}
+    ntri = len(linewave)-2
+    for k in range(ntri):
+        # the 3 lines
+        l1,l2,l3 = linewave[k:k+3]
+        # the 3 "sides", ratios of the line separations
+        s1 = abs( (l1-l3) / (l1-l2) )
+        s2 = abs( (l1-l2) / (l2-l3) )
+        s3 = abs( (l1-l3) / (l2-l3) )
+
+        sides = [s1,s2,s3]
+        lines = [l1,l2,l3]
+        ss = np.argsort(sides)
+
+        d.update( {(sides[ss[0]], sides[ss[1]], sides[ss[2]]):
+                       (lines[ss[0]], lines[ss[1]], lines[ss[2]])} )
+    return d
 
 
 def LineHash(calimage, trim=True):
@@ -53,6 +84,41 @@ def LineHash(calimage, trim=True):
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
+    flux_thresh = np.percentile(slice, 97)
+    # find flux above threshold
+    high = np.where( (slice >= flux_thresh) )
+    # find  individual peaks (separated by > 1 pixel)
+    pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
+    # the number of pixels around the "peak" to fit over
+    pwidth = 10
+    # offset from start/end of array by at least same # of pixels
+    pk = pk[pk > pwidth]
+    pk = pk[pk < (len(slice)-pwidth)]
+
+    # the arrays to store the estimated peaks in
+    pcent_pix = np.zeros_like(pk,dtype='float')
+    wcent_pix = np.zeros_like(pk,dtype='float')
+
+    # for each peak, fit a gaussian to find robust center
+    for i in range(len(pk)):
+        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
+        yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
+
+        pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
+        popt,pcov = curve_fit(pydis._gaus, np.arange(len(xi),dtype='float'), yi,
+                              p0=pguess)
+
+        # the gaussian center of the line in pixel units
+        pcent_pix[i] = (pk[i]-pwidth) + popt[2]
+        # and the peak in wavelength units
+        wcent_pix[i] = xi[np.nanargmax(yi)]
+
+    # build observed triangles
+    tri = _MakeTris(wcent_pix)
+
+    # construct the standard object triangles (maybe could be restructured)
+    std = _BuildLineDict(linelist='henear.dat')
+
 
 
 def _BuildLineDict(linelist='henear.dat'):
@@ -69,25 +135,10 @@ def _BuildLineDict(linelist='henear.dat'):
     linewave = np.loadtxt(dir + linelist, dtype='float',
                            skiprows=1, usecols=(0,), unpack=True)
 
-    # go from blue to red, build list of triangles
-    # do Nlines - 2 "triangles", 1 pass thru data w/ adjacent lines only
-    # build dict of triangle side ratios
-    d = {}
-    ntri = len(linewave)-2
-    for k in range(ntri):
-        # the 3 lines
-        l1,l2,l3 = linewave[k:k+3]
-        # the 3 "sides", ratios of the line separations
-        s1 = abs( (l1-l3) / (l1-l2) )
-        s2 = abs( (l1-l2) / (l2-l3) )
-        s3 = abs( (l1-l3) / (l2-l3) )
+    # sort the lines, just in case the file is not sorted
+    linewave.sort()
 
-        sides = [s1,s2,s3]
-        lines = [l1,l2,l3]
-        ss = np.argsort(sides)
-
-        d.update({(sides[ss[0]], sides[ss[1]], sides[ss[2]]):
-                      (lines[ss[0]], lines[ss[1]], lines[ss[2]])})
+    d = _MakeTris(linewave)
 
     # now, how to save this dict? or should we just return it?
     return d

@@ -77,7 +77,7 @@ def OpenImg(file, trim=True):
 
     Returns
     -------
-    image, exptime, airmass
+    image, exptime, airmass, wapprox
     """
 
     hdu = fits.open(file)
@@ -98,9 +98,27 @@ def OpenImg(file, trim=True):
         except KeyError:
             airmass = 1.0
 
+    # compute the approximate wavelength solution
+    try:
+        disp_approx = hdu[0].header['DISPDW']
+        wcen_approx = hdu[0].header['DISPWC']
+        # the red chip wavelength is backwards (DIS specific)
+        clr = hdu[0].header['DETECTOR']
+        if (clr.lower()=='red'):
+            sign = -1.0
+        else:
+            sign = 1.0
+        wapprox = (np.arange(raw.shape[0]) - (raw.shape[0])/2.0) * \
+                  disp_approx * sign + wcen_approx
+    except KeyError:
+        # if these keywords aren't in the header, just return pixel #
+        wapprox = np.arange(raw.shape[0])
+
     exptime = hdu[0].header['EXPTIME']
+
     hdu.close(closed=True)
-    return raw, exptime, airmass
+
+    return raw, exptime, airmass, wapprox
 
 
 def biascombine(biaslist, output='BIAS.fits', trim=True):
@@ -599,6 +617,10 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
     else:
         sign = 1.0
     hdu.close(closed=True)
+
+    #-- this is how I *want* to do this. Need to header values later though...
+    # img, _, _, wtemp = OpenImg(calimage, trim=trim)
+
 
     # take a slice thru the data (+/- 10 pixels) in center row of chip
     slice = img[img.shape[0]/2-10:img.shape[0]/2+10,:].sum(axis=0)

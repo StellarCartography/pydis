@@ -12,7 +12,7 @@ import matplotlib.cm as cm
 import datetime
 
 
-def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
+def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                stdstar='', trace_recenter=False, trace_interac=True,
                trace1=False, ntracesteps=15,
                airmass_file='kpnoextinct.dat',
@@ -103,28 +103,42 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
 
     """
 
-    # assume specfile is a list of file names of object
-    bias = pydis.biascombine(biaslist, trim=trim)
-    flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
-                                 flat_poly=flat_order, response=flat_response)
+
+    if (len(biaslist) > 0):
+        bias = pydis.biascombine(biaslist, trim=trim)
+    else:
+        bias = 0.0
+
+    if (len(biaslist) > 0) and (len(flatlist) > 0):
+        flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim,
+                                           mode=flat_mode,display=False,
+                                           flat_poly=flat_order, response=flat_response)
+    else:
+        flat = 1.0
+        fmask_out = (1,)
+
 
     if HeNeAr_prev is False:
         prev = ''
     else:
         prev = HeNeAr_file+'.lines'
+
     # do the HeNeAr mapping first, must apply to all science frames
-    wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
-                      previous=prev,mode='poly',
-                      display=display_HeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
+    if (len(HeNeAr_file) > 0):
+        wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
+                                interac=HeNeAr_interac, previous=prev,mode='poly',
+                                display=display_HeNeAr, tol=HeNeAr_tol,
+                                fit_order=HeNeAr_order)
 
 
     # read in the list of target spectra
+    # assumes specfile is a list of file names of object
     specfile = np.loadtxt(speclist, dtype='string')
 
     for i in range(len(specfile)):
         spec = specfile[i]
         print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
-        raw, exptime, airmass = pydis.OpenImg(spec, trim=trim)
+        raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
 
         # remove bias and flat, divide by exptime
         data = ((raw - bias) / flat) / exptime
@@ -161,7 +175,11 @@ def autoreduce(speclist, flatlist, biaslist, HeNeAr_file,
             plt.show()
 
 
-        wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+        if (len(HeNeAr_file) > 0):
+            wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+        else:
+            # if no line lamp given, use approx from the img header
+            wfinal = wapprox
 
         # plt.figure()
         # plt.plot(wfinal,'r')
@@ -264,7 +282,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     #-- the standard star, set the stage
     specfile = np.loadtxt(speclist,dtype='string')
     spec = specfile[0]
-    raw, exptime, airmass = pydis.OpenImg(spec, trim=trim)
+    raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
     data = ((raw - bias) / flat) / exptime
 
     trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
@@ -283,7 +301,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     #-- the target star exposures, stack and proceed
     for i in range(1,len(specfile)):
         spec = specfile[i]
-        raw, exptime, airmass = pydis.OpenImg(spec, trim=trim)
+        raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
         data_i = ((raw - bias) / flat) / exptime
         if (i==1):
             all_data = data_i

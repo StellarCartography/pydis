@@ -172,6 +172,30 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
     return bias
 
 
+def overscanbias(img, cols=(1,), rows=(1,)):
+    '''
+    Generate a bias frame based on overscan region.
+    Can work with rows or columns, pass either kwarg the limits:
+    >>> bias = overscanbias(imagedata, cols=(1024,1050))
+    '''
+    bias = np.zeros_like(img)
+    if len(cols) > 1:
+        bcol = np.mean(img[:, cols[0]:cols[1]], axis=0)
+        for j in range(img.shape()[1]):
+            img[j,:] = bcol
+
+    elif len(rows) > 1:
+        brow = np.mean(img[rows[0]:rows[1], :], axis=1)
+        for j in range(img.shape()[0]):
+            img[j,:] = brow
+
+    else:
+        print('OVERSCANBIAS ERROR: need to pass either cols=(a,b) or rows=(a,b),')
+        print('setting bias = zero as result!')
+
+    return bias
+
+
 def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
                 display=True, flat_poly=5, response=True):
     """

@@ -62,6 +62,7 @@ def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
     return
 
 
+# now starting new branch to change this!
 def OpenImg(file, trim=True):
     """
     A simple wrapper for astropy.io.fits (pyfits) to open and extract

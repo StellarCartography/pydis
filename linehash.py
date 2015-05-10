@@ -84,7 +84,9 @@ def LineHash(calimage, trim=True):
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
-    flux_thresh = np.percentile(slice, 97)
+    # the flux threshold to select peaks at
+    flux_thresh = np.percentile(slice, 90)
+
     # find flux above threshold
     high = np.where( (slice >= flux_thresh) )
     # find  individual peaks (separated by > 1 pixel)
@@ -118,6 +120,10 @@ def LineHash(calimage, trim=True):
 
     # construct the standard object triangles (maybe could be restructured)
     std = _BuildLineDict(linelist='henear.dat')
+
+    # now step thru each observed "tri", see if it matches any in "std"
+    # within some tolerance (maybe say 5% for all 3 ratios?)
+
 
 
 

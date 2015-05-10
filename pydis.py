@@ -63,7 +63,8 @@ def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
 
 
 # now starting new branch to change this!
-def OpenImg(file, trim=True):
+# def OpenImg(file, trim=True):
+class OpenImg:
     """
     A simple wrapper for astropy.io.fits (pyfits) to open and extract
     the data we want from images and headers.
@@ -78,48 +79,51 @@ def OpenImg(file, trim=True):
 
     Returns
     -------
-    image, exptime, airmass, wapprox
+    image object
     """
+    def __init__(self, file, trim=True):
+        self.file = file
+        self.trim = trim
 
-    hdu = fits.open(file)
-    if trim is True:
-        datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-        d = map(float, datasec)
-        raw = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
-    else:
-        raw = hdu[0].data
-
-    try:
-        airmass = hdu[0].header['AIRMASS']
-    except KeyError:
-        try:
-            # try using the Zenith Distance (assume in degrees)
-            ZD = hdu[0].header['ZD'] / 180.0 * np.pi
-            airmass = 1.0/np.cos(ZD) # approximate airmass
-        except KeyError:
-            airmass = 1.0
-
-    # compute the approximate wavelength solution
-    try:
-        disp_approx = hdu[0].header['DISPDW']
-        wcen_approx = hdu[0].header['DISPWC']
-        # the red chip wavelength is backwards (DIS specific)
-        clr = hdu[0].header['DETECTOR']
-        if (clr.lower()=='red'):
-            sign = -1.0
+        hdu = fits.open(file)
+        if trim is True:
+            self.datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
+            d = map(float, self.datasec)
+            self.data = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
         else:
-            sign = 1.0
-        wapprox = (np.arange(raw.shape[0]) - (raw.shape[0])/2.0) * \
-                  disp_approx * sign + wcen_approx
-    except KeyError:
-        # if these keywords aren't in the header, just return pixel #
-        wapprox = np.arange(raw.shape[0])
+            self.data = hdu[0].data
 
-    exptime = hdu[0].header['EXPTIME']
+        try:
+            self.airmass = hdu[0].header['AIRMASS']
+        except KeyError:
+            try:
+                # try using the Zenith Distance (assume in degrees)
+                ZD = hdu[0].header['ZD'] / 180.0 * np.pi
+                self.airmass = 1.0/np.cos(ZD) # approximate airmass
+            except KeyError:
+                self.airmass = 1.0
 
-    hdu.close(closed=True)
+        # compute the approximate wavelength solution
+        try:
+            self.disp_approx = hdu[0].header['DISPDW']
+            self.wcen_approx = hdu[0].header['DISPWC']
+            # the red chip wavelength is backwards (DIS specific)
+            clr = hdu[0].header['DETECTOR']
+            if (clr.lower()=='red'):
+                sign = -1.0
+            else:
+                sign = 1.0
+            self.wavelength = (np.arange(self.data.shape[0]) - (self.data.shape[0])/2.0) * \
+                      self.disp_approx * sign + self.wcen_approx
+        except KeyError:
+            # if these keywords aren't in the header, just return pixel #
+            self.wavelength = np.arange(self.data.shape[0])
 
-    return raw, exptime, airmass, wapprox
+        self.exptime = hdu[0].header['EXPTIME']
+
+        hdu.close(closed=True)
+
+        # return raw, exptime, airmass, wapprox
 
 
 def biascombine(biaslist, output='BIAS.fits', trim=True):

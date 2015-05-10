@@ -138,7 +138,13 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
     for i in range(len(specfile)):
         spec = specfile[i]
         print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
-        raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
+        # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
+        img = pydis.OpenImg(spec, trim=trim)
+        raw = img.data
+        exptime = img.exptime
+        airmass = img.airmass
+        wapprox = img.wavelength
+
 
         # remove bias and flat, divide by exptime
         data = ((raw - bias) / flat) / exptime
@@ -282,7 +288,13 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     #-- the standard star, set the stage
     specfile = np.loadtxt(speclist,dtype='string')
     spec = specfile[0]
-    raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
+    # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
+    img = pydis.OpenImg(spec, trim=trim)
+    raw = img.data
+    exptime = img.exptime
+    airmass = img.airmass
+    wapprox = img.wavelength
+
     data = ((raw - bias) / flat) / exptime
 
     trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
@@ -301,7 +313,12 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     #-- the target star exposures, stack and proceed
     for i in range(1,len(specfile)):
         spec = specfile[i]
-        raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
+        # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
+        img = pydis.OpenImg(spec, trim=trim)
+        raw = img.data
+        exptime = img.exptime
+        airmass = img.airmass
+        wapprox = img.wavelength
         data_i = ((raw - bias) / flat) / exptime
         if (i==1):
             all_data = data_i

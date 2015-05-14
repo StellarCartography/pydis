@@ -20,6 +20,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                apwidth=8, skysep=3, skywidth=7, skydeg=0,
                HeNeAr_prev=False, HeNeAr_interac=True,
                HeNeAr_tol=20, HeNeAr_order=3, display_HeNeAr=False,
+               std_mode='spline', std_order=12, display_std=False,
                trim=True, write_reduced=True,
                display=True, display_final=True):
     """
@@ -203,7 +204,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
         # !! assume first object in list is std star !!
         if (len(stdstar) > 0) and (i==0):
             sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
-                                   mode='spline',polydeg=12)
+                                   mode=std_mode, polydeg=std_order, display=display_std)
             sens_wave = wfinal
 
         elif (len(stdstar) == 0) and (i==0):
@@ -212,7 +213,8 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
             sens_wave = wfinal
 
         # final step in reduction, apply sensfunc
-        ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
+        ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr,
+                                           sens_wave, sens_flux)
 
 
         if write_reduced is True:

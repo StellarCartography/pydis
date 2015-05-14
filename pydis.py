@@ -317,7 +317,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
 
 
 def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
-             recenter=False, prevtrace=(0,), bigbox=15, display=True):
+             recenter=False, prevtrace=(0,), bigbox=15, display=False):
     """
     Trace the spectrum aperture in an image
 

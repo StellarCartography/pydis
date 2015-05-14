@@ -86,6 +86,14 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
         The polynomial order to use to interpolate between identified
         peaks in the HeNeAr (Default is 2)
     display_HeNeAr : bool, optional
+    std_mode : str, optional
+        Fit mode to use with the flux standard star. Options are 'spline'
+        and 'poly' (Default is 'spline')
+    std_order : int, optional
+        The order of polynomial to fit, if std_mode='poly'. (Default is 12)
+    display_std : bool, optional
+        If set, display plots of the flux standard being fit (Default is
+        False)
     trim : bool, optional
         Trim the image using the DATASEC keyword in the header, assuming
         has format of [0:1024,0:512] (Default is True)

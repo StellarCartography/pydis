@@ -113,11 +113,12 @@ class OpenImg:
                 sign = -1.0
             else:
                 sign = 1.0
-            self.wavelength = (np.arange(self.data.shape[0]) - (self.data.shape[0])/2.0) * \
-                      self.disp_approx * sign + self.wcen_approx
+            self.wavelength = (np.arange(self.data.shape[1]) -
+                               (self.data.shape[1])/2.0) * \
+                              self.disp_approx * sign + self.wcen_approx
         except KeyError:
             # if these keywords aren't in the header, just return pixel #
-            self.wavelength = np.arange(self.data.shape[0])
+            self.wavelength = np.arange(self.data.shape[1])
 
         self.exptime = hdu[0].header['EXPTIME']
 
@@ -1362,6 +1363,12 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
             sensfunc2 = np.polyval(fit, obj_wave)
 
         if display is True:
+            plt.figure()
+            plt.plot(std_wave, std_flux, 'r', alpha=0.5)
+            plt.xlabel('Wavelength')
+            plt.ylabel('Standard Star Flux')
+            plt.show()
+
             plt.figure()
             plt.plot(obj_wave, obj_flux,'k')
             plt.plot(obj_wave_ds, obj_flux_ds,'bo')

@@ -33,17 +33,23 @@ pro prep_for_pydis
      ; interpolate on to the down-sampled wavelength range
      fout = interpol(f,w,wout)
      
-     plot,w,f
-     oplot,wout,fout,psym=4
+     ;plot,w,f
+     ;oplot,wout,fout,psym=4
      
      bout = fltarr(n_elements(fout))+binsz
-     
      mout = flux2mag(wout,fout)
-     forprint,comm=file, wout,mout,bout, $
-              textout='dd94/'+strmid(file, 0, strpos(file,'.fit'))+'.dat'
-     
-     plot,wout,mout
-  endfor
 
+     mout1 = strtrim(string(mout,f='(F6.2)'),2)
+     wout1 = strtrim(string(wout,f='(F6.0)'),2)
+     bout1 = strtrim(string(bout,f='(F6.0)'),2)
+     
+     forprint,comm=file, wout1,mout1,bout1, $
+              textout='dd94/'+strmid(file, 0, strpos(file,'.fit'))+'.dat',$
+              f='(A," ",A," ",A)'
+              
+     
+     ;plot,wout,mout
+  endfor
+  stop
   return
 end

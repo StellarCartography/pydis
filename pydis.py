@@ -62,6 +62,29 @@ def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
     return
 
 
+def _CheckMono(wave):
+    '''
+    Check if the wavelength array is monotonically increasing. Return a
+    warning if not. NOTE: because RED/BLUE wavelength direction is flipped
+    it has to check both increasing and decreasing. It must satisfy one!
+
+    Method adopted from here:
+    http://stackoverflow.com/a/4983359/4842871
+    '''
+
+    # increasing
+    up = all(x<y for x, y in zip(wave, wave[1:]))
+
+    # decreasing
+    dn = all(x>y for x, y in zip(wave, wave[1:]))
+
+    if (up is False) and (dn is False):
+        print("WARNING: Wavelength array is not monotonically increasing!")
+
+    return
+
+
+
 # now starting new branch to change this!
 # def OpenImg(file, trim=True):
 class OpenImg:
@@ -905,6 +928,9 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             pcent, wcent = np.loadtxt(previous, dtype='float',
                                       unpack=True, skiprows=1,delimiter=',')
 
+
+        #---  FIT SMOOTH FUNCTION ---
+
         # fit polynomial thru the peak wavelengths
         # xpix = (np.arange(len(slice))-len(slice)/2)
         # coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
@@ -937,6 +963,8 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             print(" ")
 
             plt.show()
+
+            _CheckMono(wtemp)
 
             print(' ')
             done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
@@ -1038,6 +1066,8 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         coeff = np.polyfit(pcent2, wcent2, fit_order)
         wtemp = np.polyval(coeff, xpix)
 
+
+        #---  FIT SMOOTH FUNCTION ---
         if interac is True:
             done = str(fit_order)
             while (done != 'd'):
@@ -1065,10 +1095,13 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
                 plt.show()
 
+                _CheckMono(wtemp)
+
                 print(' ')
                 done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
 
-    #-- trace the peaks vertically
+
+    #-- trace the peaks vertically --
     # how far can the trace be bent, i.e. how big a window to fit over?
     maxbend = 10 # pixels (+/-)
 

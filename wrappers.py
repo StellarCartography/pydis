@@ -348,7 +348,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     plt.plot(wfinal, ffinal)
     plt.title("CO-ADD DONE")
     plt.ylim( (np.percentile(ffinal,5),
-                   np.percentile(ffinal,95)) )
+               np.percentile(ffinal,95)) )
     plt.show()
 
     return wfinal, ffinal, efinal

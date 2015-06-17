@@ -84,9 +84,6 @@ def _CheckMono(wave):
     return
 
 
-
-# now starting new branch to change this!
-# def OpenImg(file, trim=True):
 class OpenImg:
     """
     A simple wrapper for astropy.io.fits (pyfits) to open and extract

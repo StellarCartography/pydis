@@ -387,8 +387,7 @@ def CoAddFinal(frames, mode='mean', display=True):
 
 
 def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
-               stdstar='', trace_recenter=False, trace_interac=True,
-               trace1=False, ntracesteps=15,
+               stdstar='', trace_recenter=False, ntracesteps=15,
                airmass_file='apoextinct.dat',
                flat_mode='spline', flat_order=9, flat_response=True,
                apwidth=8, skysep=3, skywidth=7, skydeg=0,
@@ -398,7 +397,6 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
                trim=True, write_reduced=True,
                display=True, display_final=True):
 
-    print('WARNING: CURRENTLY THIS IS A COPY OF AUTOREDUCE!')
 
     if (len(biaslist) > 0):
         bias = pydis.biascombine(biaslist, trim=trim)
@@ -448,94 +446,111 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
             plt.title(spec+' (flat and bias corrected)')
             plt.show()
 
-        # with reduced data, trace the aperture
-        if (i==0) or (trace1 is False):
-            trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
-                             recenter=trace_recenter, interac=trace_interac)
+        # with reduced data, trace BOTH apertures
+        trace_1 = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+                                 recenter=trace_recenter, interac=True)
+        trace_2 = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+                                 recenter=trace_recenter, interac=True)
 
-        # extract the spectrum, measure sky values along trace, get flux errors
-        ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
-                                            skysep=skysep,skywidth=skywidth,
-                                            skydeg=skydeg,coaddN=1)
 
         xbins = np.arange(data.shape[1])
         if display is True:
             plt.figure()
             plt.imshow(np.log10(data), origin='lower',aspect='auto',cmap=cm.Greys_r)
-            plt.plot(xbins, trace,'b',lw=1)
-            plt.plot(xbins, trace-apwidth,'r',lw=1)
-            plt.plot(xbins, trace+apwidth,'r',lw=1)
-            plt.plot(xbins, trace-apwidth-skysep,'g',lw=1)
-            plt.plot(xbins, trace-apwidth-skysep-skywidth,'g',lw=1)
-            plt.plot(xbins, trace+apwidth+skysep,'g',lw=1)
-            plt.plot(xbins, trace+apwidth+skysep+skywidth,'g',lw=1)
+            plt.plot(xbins, trace_1,'b',lw=1)
+            plt.plot(xbins, trace_1-apwidth,'r',lw=1)
+            plt.plot(xbins, trace_1+apwidth,'r',lw=1)
+            plt.plot(xbins, trace_1-apwidth-skysep,'g',lw=1)
+            plt.plot(xbins, trace_1-apwidth-skysep-skywidth,'g',lw=1)
+            plt.plot(xbins, trace_1+apwidth+skysep,'g',lw=1)
+            plt.plot(xbins, trace_1+apwidth+skysep+skywidth,'g',lw=1)
 
-            plt.title('(with trace, aperture, and sky regions)')
+            plt.plot(xbins, trace_2,'b',lw=1)
+            plt.plot(xbins, trace_2-apwidth,'r',lw=1)
+            plt.plot(xbins, trace_2+apwidth,'r',lw=1)
+            plt.plot(xbins, trace_2-apwidth-skysep,'g',lw=1)
+            plt.plot(xbins, trace_2-apwidth-skysep-skywidth,'g',lw=1)
+            plt.plot(xbins, trace_2+apwidth+skysep,'g',lw=1)
+            plt.plot(xbins, trace_2+apwidth+skysep+skywidth,'g',lw=1)
+
+            plt.title('(Both Traces, with aperture and sky regions)')
             plt.show()
 
-        if (len(HeNeAr_file) > 0):
-            wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
-        else:
-            # if no line lamp given, use approx from the img header
-            wfinal = wapprox
 
-        # subtract local sky level, divide by exptime to get flux units
-        #     (counts / sec)
-        flux_red = (ext_spec - sky)
+        t_indx = 1
+        # now do the processing for both traces as if separate stars
+        for trace in [trace_1, trace_2]:
+            tnum = '_' + str(t_indx)
+            t_indx = t_indx + 1
 
-        # now correct the spectrum for airmass extinction
-        flux_red_x = pydis.AirmassCor(wfinal, flux_red, airmass,
-                                airmass_file=airmass_file)
+            # extract the spectrum, measure sky values along trace, get flux errors
+            ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
+                                            skysep=skysep,skywidth=skywidth,
+                                            skydeg=skydeg,coaddN=1)
 
-        # now get flux std IF stdstar is defined
-        # !! assume first object in list is std star !!
-        if (len(stdstar) > 0) and (i==0):
-            sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
-                                   mode=std_mode, polydeg=std_order, display=display_std)
-            sens_wave = wfinal
+            if (len(HeNeAr_file) > 0):
+                wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+            else:
+                # if no line lamp given, use approx from the img header
+                wfinal = wapprox
 
-        elif (len(stdstar) == 0) and (i==0):
-            # if 1st obj not the std, then just make array of 1's to multiply thru
-            sens_flux = np.ones_like(flux_red_x)
-            sens_wave = wfinal
+            # subtract local sky level, divide by exptime to get flux units
+            #     (counts / sec)
+            flux_red = (ext_spec - sky)
 
-        # final step in reduction, apply sensfunc
-        ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr,
-                                           sens_wave, sens_flux)
+            # now correct the spectrum for airmass extinction
+            flux_red_x = pydis.AirmassCor(wfinal, flux_red, airmass,
+                                    airmass_file=airmass_file)
 
-        if write_reduced is True:
-            pydis._WriteSpec(spec, wfinal, ffinal, efinal, trace)
+            # now get flux std IF stdstar is defined
+            # !! assume first object in list is std star !!
+            if (len(stdstar) > 0) and (i==0):
+                sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+                                       mode=std_mode, polydeg=std_order, display=display_std)
+                sens_wave = wfinal
 
-            now = datetime.datetime.now()
+            elif (len(stdstar) == 0) and (i==0):
+                # if 1st obj not the std, then just make array of 1's to multiply thru
+                sens_flux = np.ones_like(flux_red_x)
+                sens_wave = wfinal
 
-            lout = open(spec+'.log','w')
-            lout.write('#  This file contains the reduction parameters \n'+
-                       '#  used in autoreduce for '+spec+'\n')
-            lout.write('DATE-REDUCED = '+str(now)+'\n')
-            lout.write('HeNeAr_tol   = '+str(HeNeAr_tol)+'\n')
-            lout.write('HeNeAr_order = '+str(HeNeAr_order)+'\n')
-            lout.write('trace1       = '+str(trace1)+'\n')
-            lout.write('ntracesteps  = '+str(ntracesteps)+'\n')
-            lout.write('trim         = '+str(trim)+'\n')
-            lout.write('response     = '+str(flat_response)+'\n')
-            lout.write('apwidth      = '+str(apwidth)+'\n')
-            lout.write('skysep       = '+str(skysep)+'\n')
-            lout.write('skywidth     = '+str(skywidth)+'\n')
-            lout.write('skydeg       = '+str(skydeg)+'\n')
-            lout.write('stdstar      = '+str(stdstar)+'\n')
-            lout.write('airmass_file = '+str(airmass_file)+'\n')
-            lout.close()
+            # final step in reduction, apply sensfunc
+            ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr,
+                                               sens_wave, sens_flux)
 
-        if display_final is True:
-            # the final figure to plot
-            plt.figure()
-            # plt.plot(wfinal, ffinal)
-            plt.errorbar(wfinal, ffinal, yerr=efinal)
-            plt.xlabel('Wavelength')
-            plt.ylabel('Flux')
-            plt.title(spec)
-            #plot within percentile limits
-            plt.ylim( (np.percentile(ffinal,2),
-                       np.percentile(ffinal,98)) )
-            plt.show()
+            if write_reduced is True:
+                pydis._WriteSpec(spec+tnum, wfinal, ffinal, efinal, trace)
+
+                now = datetime.datetime.now()
+
+                lout = open(spec+tnum+'.log','w')
+                lout.write('#  This file contains the reduction parameters \n'+
+                           '#  used in autoreduce for '+spec+'\n')
+                lout.write('DATE-REDUCED = '+str(now)+'\n')
+                lout.write('HeNeAr_tol   = '+str(HeNeAr_tol)+'\n')
+                lout.write('HeNeAr_order = '+str(HeNeAr_order)+'\n')
+                lout.write('trace1       = '+str(False)+'\n')
+                lout.write('ntracesteps  = '+str(ntracesteps)+'\n')
+                lout.write('trim         = '+str(trim)+'\n')
+                lout.write('response     = '+str(flat_response)+'\n')
+                lout.write('apwidth      = '+str(apwidth)+'\n')
+                lout.write('skysep       = '+str(skysep)+'\n')
+                lout.write('skywidth     = '+str(skywidth)+'\n')
+                lout.write('skydeg       = '+str(skydeg)+'\n')
+                lout.write('stdstar      = '+str(stdstar)+'\n')
+                lout.write('airmass_file = '+str(airmass_file)+'\n')
+                lout.close()
+
+            if display_final is True:
+                # the final figure to plot
+                plt.figure()
+                # plt.plot(wfinal, ffinal)
+                plt.errorbar(wfinal, ffinal, yerr=efinal)
+                plt.xlabel('Wavelength')
+                plt.ylabel('Flux')
+                plt.title(spec)
+                #plot within percentile limits
+                plt.ylim( (np.percentile(ffinal,2),
+                           np.percentile(ffinal,98)) )
+                plt.show()
     return

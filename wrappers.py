@@ -425,7 +425,8 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
     # read in the list of target spectra
     # assumes specfile is a list of file names of object
-    specfile = np.loadtxt(speclist, dtype='string')
+    #-> wrap with array and flatten because Numpy sucks with one-element arrays...
+    specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()
 
     for i in range(len(specfile)):
         spec = specfile[i]

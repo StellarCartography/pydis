@@ -45,6 +45,29 @@ def _MakeTris(linewave0):
     return d
 
 
+def _BuildLineDict(linelist='henear.dat'):
+    '''
+    Build the dictionary (hash table) of lines from the master file.
+
+    Goal is to do this once, store it in some hard file form for users.
+    Users then would only re-run this function if linelist changed, say if
+    a different set of lamps were used.
+    '''
+
+    dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+
+    linewave = np.loadtxt(dir + linelist, dtype='float',
+                           skiprows=1, usecols=(0,), unpack=True)
+
+    # sort the lines, just in case the file is not sorted
+    linewave.sort()
+
+    d = _MakeTris(linewave)
+
+    # now, how to save this dict? or should we just return it?
+    return d
+
+
 def LineHash(calimage, trim=True):
     '''
     (REWORD later)
@@ -125,26 +148,3 @@ def LineHash(calimage, trim=True):
     # within some tolerance (maybe say 5% for all 3 ratios?)
 
 
-
-
-def _BuildLineDict(linelist='henear.dat'):
-    '''
-    Build the dictionary (hash table) of lines from the master file.
-
-    Goal is to do this once, store it in some hard file form for users.
-    Users then would only re-run this function if linelist changed, say if
-    a different set of lamps were used.
-    '''
-
-    dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
-
-    linewave = np.loadtxt(dir + linelist, dtype='float',
-                           skiprows=1, usecols=(0,), unpack=True)
-
-    # sort the lines, just in case the file is not sorted
-    linewave.sort()
-
-    d = _MakeTris(linewave)
-
-    # now, how to save this dict? or should we just return it?
-    return d

@@ -81,6 +81,7 @@ def LineHash(calimage, trim=True):
 
     '''
 
+    # !!! this should be changed to pydis.OpenImg ?
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -135,10 +136,10 @@ def LineHash(calimage, trim=True):
 
         # the gaussian center of the line in pixel units
         pcent_pix[i] = (pk[i]-pwidth) + popt[2]
-        # and the peak in wavelength units
+        # and the peak in approximate wavelength units
         wcent_pix[i] = xi[np.nanargmax(yi)]
 
-    # build observed triangles
+    # build observed triangles from HeNeAr file, in wavelength units
     tri = _MakeTris(wcent_pix)
 
     # construct the standard object triangles (maybe could be restructured)
@@ -147,4 +148,27 @@ def LineHash(calimage, trim=True):
     # now step thru each observed "tri", see if it matches any in "std"
     # within some tolerance (maybe say 5% for all 3 ratios?)
 
+    # the maximum cartesian distance in tri-space
+    maxdist = 0.5 # this will need tuning!
 
+    # for each observed tri
+    for i in range(0,len(tri)):
+        obs = tri.keys()[i]
+        dist = []
+        # search over every library tri, find nearest (BRUTE FORCE)
+        for j in range(0,len(std)):
+            ref = std.keys()[j]
+
+            dist.append( ((obs[0]-ref[0])**2. +
+                         (obs[1]-ref[1])**2. +
+                         (obs[2]-ref[2])**2.)**0.5 )
+
+        if (min(dist)<maxdist):
+            indx = dist.index(min(dist))
+            # replace the observed wavelengths with the catalog values
+            tri[tri.keys()[i]] = std.values()[indx]
+        else:
+            # need to do something better here too
+            tri[tri.keys()[i]] = [float('nan'), float('nan'), float('nan')]
+
+    # now use the matched tris, need to get back to wavelength vs pixel

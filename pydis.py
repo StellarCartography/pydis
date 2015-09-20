@@ -558,6 +558,43 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
     return xcent_big, ycent_big, wcent_big
 
 
+def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
+    # sort data, cut top x% of flux data as peak threshold
+    flux_thresh = np.percentile(slice, 97)
+
+    # find flux above threshold
+    high = np.where( (slice >= flux_thresh) )
+
+    # find  individual peaks (separated by > 1 pixel)
+    pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
+
+    # the number of pixels around the "peak" to fit over
+    pwidth = 10
+    # offset from start/end of array by at least same # of pixels
+    pk = pk[pk > pwidth]
+    pk = pk[pk < (len(slice)-pwidth)]
+
+    print('Found '+str(len(pk))+' peaks in HeNeAr to try')
+
+    pcent_pix = np.zeros_like(pk,dtype='float')
+    wcent_pix = np.zeros_like(pk,dtype='float') # wtemp[pk]
+    # for each peak, fit a gaussian to find center
+    for i in range(len(pk)):
+        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
+        yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
+
+        pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
+        popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
+                              p0=pguess)
+
+        # the gaussian center of the line in pixel units
+        pcent_pix[i] = (pk[i]-pwidth) + popt[2]
+        # and the peak in wavelength units
+        wcent_pix[i] = xi[np.nanargmax(yi)]
+
+    return pcent_pix, wcent_pix
+
+
 def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
                coaddN=1):
     """
@@ -761,6 +798,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         linewave = np.loadtxt(dir + linelist,dtype='float',
                               skiprows=1,usecols=(0,),unpack=True)
 
+        '''
         # sort data, cut top x% of flux data as peak threshold
         flux_thresh = np.percentile(slice, 97)
 
@@ -811,6 +849,9 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         if display is True:
             plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='blue')
             plt.show()
+        '''
+
+        pcent_pix, wcent_pix = find_peaks(wtemp, slice, pwidth=10, pthreshold=97)
 
     #   loop thru each peak, from center outwards. a greedy solution
     #   find nearest list line. if not line within tolerance, then skip peak

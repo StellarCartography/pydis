@@ -45,7 +45,7 @@ def _MakeTris(linewave0):
     return d
 
 
-def _BuildLineDict(linelist='henear.dat'):
+def _BuildLineDict(linelist='apohenear.dat'):
     '''
     Build the dictionary (hash table) of lines from the master file.
 
@@ -68,7 +68,7 @@ def _BuildLineDict(linelist='henear.dat'):
     return d
 
 
-def LineHash(calimage, trim=True):
+def LineHash(calimage, trim=True, linelist='apohenear.dat'):
     '''
     (REWORD later)
     Find emission lines, match triangles to dictionary (hash table),
@@ -142,8 +142,12 @@ def LineHash(calimage, trim=True):
     # build observed triangles from HeNeAr file, in wavelength units
     tri = _MakeTris(wcent_pix)
 
+    # make the same observed tri using pixel units.
+    # ** should correspond directly **
+    tri_pix = _MakeTris(pcent_pix)
+
     # construct the standard object triangles (maybe could be restructured)
-    std = _BuildLineDict(linelist='henear.dat')
+    std = _BuildLineDict(linelist=linelist)
 
     # now step thru each observed "tri", see if it matches any in "std"
     # within some tolerance (maybe say 5% for all 3 ratios?)
@@ -172,3 +176,20 @@ def LineHash(calimage, trim=True):
             tri[tri.keys()[i]] = [float('nan'), float('nan'), float('nan')]
 
     # now use the matched tris, need to get back to wavelength vs pixel
+    out_wave = np.array([],dtype='float')
+    out_pix = np.array([],dtype='float')
+
+    for i in range(0,len(tri)):
+        if (np.isfinite(tri.values())[i].sum() > 0):
+            out_wave = np.concatenate((out_wave, tri[tri.keys()[i]]))
+            out_pix = np.concatenate((out_pix, tri_pix[tri.keys()[i]]))
+
+    ok = np.where((np.isfinite(out_wave)))
+
+    out_wave = out_wave[ok]
+    out_pix = out_pix[ok]
+
+    out_wave.sort()
+    out_pix.sort()
+
+    return out_pix, out_wave

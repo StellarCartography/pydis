@@ -141,7 +141,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
     # read in the list of target spectra
     # assumes specfile is a list of file names of object
-    specfile = np.loadtxt(speclist, dtype='string')
+    specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()
 
     for i in range(len(specfile)):
         spec = specfile[i]
@@ -295,7 +295,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
                       display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
 
     #-- the standard star, set the stage
-    specfile = np.loadtxt(speclist,dtype='string')
+    specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()
     spec = specfile[0]
     # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
     img = pydis.OpenImg(spec, trim=trim)

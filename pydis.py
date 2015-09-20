@@ -559,8 +559,20 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
 
 
 def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
+    '''
+    given a slice thru a HeNeAr image, find the significant peaks
+
+    :param wtemp:
+    :param slice:
+    :param pwidth:
+        the number of pixels around the "peak" to fit over
+    :param pthreshold:
+    Returns
+    -------
+    Peak Pixels, Peak Wavelengths
+    '''
     # sort data, cut top x% of flux data as peak threshold
-    flux_thresh = np.percentile(slice, 97)
+    flux_thresh = np.percentile(slice, pthreshold)
 
     # find flux above threshold
     high = np.where( (slice >= flux_thresh) )
@@ -568,8 +580,7 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
     # find  individual peaks (separated by > 1 pixel)
     pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
 
-    # the number of pixels around the "peak" to fit over
-    pwidth = 10
+
     # offset from start/end of array by at least same # of pixels
     pk = pk[pk > pwidth]
     pk = pk[pk < (len(slice)-pwidth)]
@@ -584,15 +595,21 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
         yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
 
         pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-        popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
-                              p0=pguess)
+        try:
+            popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
+                                  p0=pguess)
 
-        # the gaussian center of the line in pixel units
-        pcent_pix[i] = (pk[i]-pwidth) + popt[2]
-        # and the peak in wavelength units
-        wcent_pix[i] = xi[np.nanargmax(yi)]
+            # the gaussian center of the line in pixel units
+            pcent_pix[i] = (pk[i]-pwidth) + popt[2]
+            # and the peak in wavelength units
+            wcent_pix[i] = xi[np.nanargmax(yi)]
 
-    return pcent_pix, wcent_pix
+        except RuntimeError:
+            pcent_pix[i] = float('nan')
+            wcent_pix[i] = float('nan')
+
+    okcent = np.where((np.isfinite(pcent_pix)))
+    return pcent_pix[okcent], wcent_pix[okcent]
 
 
 def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,

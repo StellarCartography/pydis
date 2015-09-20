@@ -71,7 +71,8 @@ def _BuildLineDict(linelist='apohenear.dat'):
     return sides, lines
 
 
-def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', display=False):
+def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
+               fmask=(0,), display=False):
     '''
     (REWORD later)
     Find emission lines, match triangles to dictionary (hash table),
@@ -111,6 +112,7 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', displ
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
+    '''
     # the flux threshold to select peaks at
     flux_thresh = np.percentile(slice, 90)
 
@@ -153,6 +155,9 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', displ
     okcent = np.where((np.isfinite(pcent_pix)))
     pcent_pix = pcent_pix[okcent]
     wcent_pix = wcent_pix[okcent]
+    '''
+
+    pcent_pix, wcent_pix = pydis.find_peaks(wtemp, slice, pwidth=10, pthreshold=90)
 
     # build observed triangles from HeNeAr file, in wavelength units
     tri_keys, tri_wave = _MakeTris(wcent_pix)
@@ -200,4 +205,5 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', displ
         plt.ylabel('Wavelength')
         plt.show()
 
-    return out_pix, out_wave
+    wfit = pydis.line_trace(img, out_pix, out_wave, fmask=fmask)
+    return wfit

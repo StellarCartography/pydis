@@ -125,14 +125,19 @@ def LineHash(calimage, trim=True, linelist='apohenear.dat'):
     pcent_pix = np.zeros_like(pk,dtype='float')
     wcent_pix = np.zeros_like(pk,dtype='float')
 
+    print(str(len(pk))+' peaks found to center')
     # for each peak, fit a gaussian to find robust center
     for i in range(len(pk)):
         xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
         yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
 
         pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-        popt,pcov = curve_fit(pydis._gaus, np.arange(len(xi),dtype='float'), yi,
-                              p0=pguess)
+        try:
+            popt,pcov = curve_fit(pydis._gaus, np.arange(len(xi),dtype='float'), yi,
+                                  p0=pguess)
+        except RuntimeError:
+            print('> LineHash WARNING: could not center auto-found line')
+            popt = pguess
 
         # the gaussian center of the line in pixel units
         pcent_pix[i] = (pk[i]-pwidth) + popt[2]

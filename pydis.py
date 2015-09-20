@@ -1101,10 +1101,12 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         linewave2 = np.loadtxt(dir + hireslinelist, dtype='float',
                                skiprows=1, usecols=(0,), unpack=True)
 
+        tol2 = tol # / 2.0
+
+        '''
         # use a lower flux threshold to go after smaller ampl peaks
         flux_thresh2 = np.percentile(slice, 80)
         pwidth = 10
-        tol2 = tol # / 2.0
 
         high2 = np.where( (slice >= flux_thresh2) )
         pk2 = high2[0][ ( (high2[0][1:]-high2[0][:-1]) > 1 ) ]
@@ -1136,6 +1138,8 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         ok = np.where((pcent_pix2 > -9999))
         pcent_pix2 = pcent_pix2[ok]
         wcent_pix2 = wcent_pix2[ok]
+        '''
+        pcent_pix2, wcent_pix2 = find_peaks(wtemp, slice, pwidth=10, pthreshold=80)
 
         pcent2 = []
         wcent2 = []

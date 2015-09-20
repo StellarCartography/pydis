@@ -12,7 +12,7 @@ from astropy.io import fits
 import numpy as np
 import os
 from scipy.optimize import curve_fit
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 
@@ -71,7 +71,7 @@ def _BuildLineDict(linelist='apohenear.dat'):
     return sides, lines
 
 
-def LineHash(calimage, trim=True, linelist='apohenear.dat'):
+def LineHash(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', display=False):
     '''
     (REWORD later)
     Find emission lines, match triangles to dictionary (hash table),
@@ -159,8 +159,6 @@ def LineHash(calimage, trim=True, linelist='apohenear.dat'):
 
     # now step thru each observed "tri", see if it matches any in "std"
     # within some tolerance (maybe say 5% for all 3 ratios?)
-    # the maximum cartesian distance in tri-space
-    maxdist = 0.5 # this will need tuning!
 
     # for each observed tri
     for i in range(tri_keys.shape[0]):
@@ -186,5 +184,13 @@ def LineHash(calimage, trim=True, linelist='apohenear.dat'):
 
     out_wave.sort()
     out_pix.sort()
+
+    if display is True:
+        plt.plot()
+        plt.scatter(out_pix, out_wave)
+        plt.title('LineHash Find')
+        plt.xlabel('Pixel')
+        plt.ylabel('Wavelength')
+        plt.show()
 
     return out_pix, out_wave

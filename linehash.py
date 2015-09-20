@@ -71,7 +71,7 @@ def _BuildLineDict(linelist='apohenear.dat'):
     return sides, lines
 
 
-def LineHash(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', display=False):
+def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', display=False):
     '''
     (REWORD later)
     Find emission lines, match triangles to dictionary (hash table),
@@ -138,14 +138,21 @@ def LineHash(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', display
         try:
             popt,pcov = curve_fit(pydis._gaus, np.arange(len(xi),dtype='float'), yi,
                                   p0=pguess)
-        except RuntimeError:
-            print('> LineHash WARNING: could not center auto-found line')
-            popt = pguess
+            # the gaussian center of the line in pixel units
+            pcent_pix[i] = (pk[i]-pwidth) + popt[2]
+            # and the peak in approximate wavelength units
+            wcent_pix[i] = xi[np.nanargmax(yi)]
 
-        # the gaussian center of the line in pixel units
-        pcent_pix[i] = (pk[i]-pwidth) + popt[2]
-        # and the peak in approximate wavelength units
-        wcent_pix[i] = xi[np.nanargmax(yi)]
+        except RuntimeError:
+            print('> autoHeNeAr WARNING: could not center auto-found line')
+            # popt = np.array([float('nan'), float('nan'), float('nan'),float('nan')])
+
+            pcent_pix[i] = float('nan')
+            wcent_pix[i] = float('nan')
+
+    okcent = np.where((np.isfinite(pcent_pix)))
+    pcent_pix = pcent_pix[okcent]
+    wcent_pix = wcent_pix[okcent]
 
     # build observed triangles from HeNeAr file, in wavelength units
     tri_keys, tri_wave = _MakeTris(wcent_pix)
@@ -188,7 +195,7 @@ def LineHash(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat', display
     if display is True:
         plt.plot()
         plt.scatter(out_pix, out_wave)
-        plt.title('LineHash Find')
+        plt.title('autoHeNeAr Find')
         plt.xlabel('Pixel')
         plt.ylabel('Wavelength')
         plt.show()

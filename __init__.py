@@ -5,4 +5,4 @@ from .pydis import (OpenImg, ap_trace, ap_extract, HeNeAr_fit,
 
 from .wrappers import (autoreduce, CoAddFinal, ReduceCoAdd, ReduceTwo)
 
-from .linehash import (LineHash)
+from .linehash import (autoHeNeAr)

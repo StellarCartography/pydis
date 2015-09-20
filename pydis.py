@@ -492,6 +492,72 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     return my
 
 
+def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
+    xcent_big = []
+    ycent_big = []
+    wcent_big = []
+
+    # the valid y-range of the chip
+    if (len(fmask)>1):
+        ydata = np.arange(img.shape[0])[fmask]
+    else:
+        ydata = np.arange(img.shape[0])
+
+    # split the chip in to 2 parts, above and below the center
+    ydata1 = ydata[np.where((ydata>=img.shape[0]/2))]
+    ydata2 = ydata[np.where((ydata<img.shape[0]/2))][::-1]
+
+    img_med = np.median(img)
+    # loop over every HeNeAr peak that had a good fit
+
+    for i in range(len(pcent)):
+        xline = np.arange(int(pcent[i])-maxbend,int(pcent[i])+maxbend)
+
+        # above center line (where fit was done)
+        for j in ydata1:
+            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
+            # fit gaussian, assume center at 0, width of 2
+            if j==ydata1[0]:
+                cguess = pcent[i] # xline[np.argmax(yline)]
+
+            pguess = [np.nanmax(yline),img_med,cguess,2.]
+            try:
+                popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+            except RuntimeError:
+                popt = pguess
+            cguess = popt[2] # update center pixel
+
+            xcent_big = np.append(xcent_big, popt[2])
+            ycent_big = np.append(ycent_big, j)
+            wcent_big = np.append(wcent_big, wcent[i])
+        # below center line, from middle down
+        for j in ydata2:
+            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
+            # fit gaussian, assume center at 0, width of 2
+            if j==ydata1[0]:
+                cguess = pcent[i] # xline[np.argmax(yline)]
+
+            pguess = [np.nanmax(yline),img_med,cguess,2.]
+            try:
+                popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+            except RuntimeError:
+                popt = pguess
+            cguess = popt[2] # update center pixel
+
+            xcent_big = np.append(xcent_big, popt[2])
+            ycent_big = np.append(ycent_big, j)
+            wcent_big = np.append(wcent_big, wcent[i])
+
+    if display is True:
+        plt.figure()
+        plt.imshow(np.log10(img), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
+        plt.colorbar()
+        plt.scatter(xcent_big,ycent_big,marker='|',c='r')
+        plt.show()
+
+    return xcent_big, ycent_big, wcent_big
+
+
 def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
                coaddN=1):
     """
@@ -1099,72 +1165,8 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
 
     #-- trace the peaks vertically --
-    # how far can the trace be bent, i.e. how big a window to fit over?
-    maxbend = 10 # pixels (+/-)
-
-    # 3d positions of the peaks: (x,y) and wavelength
-    xcent_big = []
-    ycent_big = []
-    wcent_big = []
-
-    # the valid y-range of the chip
-    if (len(fmask)>1):
-        ydata = np.arange(img.shape[0])[fmask]
-    else:
-        ydata = np.arange(img.shape[0])
-
-    # split the chip in to 2 parts, above and below the center
-    ydata1 = ydata[np.where((ydata>=img.shape[0]/2))]
-    ydata2 = ydata[np.where((ydata<img.shape[0]/2))][::-1]
-
-    img_med = np.median(img)
-    # loop over every HeNeAr peak that had a good fit
-
-    for i in range(len(pcent)):
-        xline = np.arange(int(pcent[i])-maxbend,int(pcent[i])+maxbend)
-
-        # above center line (where fit was done)
-        for j in ydata1:
-            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
-            # fit gaussian, assume center at 0, width of 2
-            if j==ydata1[0]:
-                cguess = pcent[i] # xline[np.argmax(yline)]
-
-            pguess = [np.nanmax(yline),img_med,cguess,2.]
-            try:
-                popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
-            except RuntimeError:
-                popt = pguess
-            cguess = popt[2] # update center pixel
-
-            xcent_big = np.append(xcent_big, popt[2])
-            ycent_big = np.append(ycent_big, j)
-            wcent_big = np.append(wcent_big, wcent[i])
-        # below center line, from middle down
-        for j in ydata2:
-            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
-            # fit gaussian, assume center at 0, width of 2
-            if j==ydata1[0]:
-                cguess = pcent[i] # xline[np.argmax(yline)]
-
-            pguess = [np.nanmax(yline),img_med,cguess,2.]
-            try:
-                popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
-            except RuntimeError:
-                popt = pguess
-            cguess = popt[2] # update center pixel
-
-            xcent_big = np.append(xcent_big, popt[2])
-            ycent_big = np.append(ycent_big, j)
-            wcent_big = np.append(wcent_big, wcent[i])
-
-    if display is True:
-        plt.figure()
-        plt.imshow(np.log10(img), origin = 'lower',aspect='auto',cmap=cm.Greys_r)
-        plt.colorbar()
-        plt.scatter(xcent_big,ycent_big,marker='|',c='r')
-        plt.show()
-
+    xcent_big, ycent_big, wcent_big = line_trace(img, pcent, wcent,
+                                                 fmask=fmask, display=display)
 
     #  fit the wavelength solution for the entire chip w/ a 2d spline
     if mode=='spline2d':

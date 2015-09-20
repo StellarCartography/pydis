@@ -12,7 +12,7 @@ from astropy.io import fits
 import numpy as np
 import os
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 
@@ -25,8 +25,6 @@ def _MakeTris(linewave0):
     linewave = linewave0.copy()
     linewave.sort()
 
-    # might want to change this to some kind of numpy array, not dict...
-    d = {}
     ntri = len(linewave)-2
     for k in range(ntri):
         # the 3 lines
@@ -36,13 +34,18 @@ def _MakeTris(linewave0):
         s2 = abs( (l1-l2) / (l2-l3) )
         s3 = abs( (l1-l3) / (l2-l3) )
 
-        sides = [s1,s2,s3]
-        lines = [l1,l2,l3]
+        sides = np.array([s1,s2,s3])
+        lines = np.array([l1,l2,l3])
         ss = np.argsort(sides)
 
-        d.update( {(sides[ss[0]], sides[ss[1]], sides[ss[2]]):
-                       (lines[ss[0]], lines[ss[1]], lines[ss[2]])} )
-    return d
+        if (k==0):
+            side_out = sides[ss]
+            line_out = lines[ss]
+        else:
+            side_out = np.vstack((side_out, sides[ss]))
+            line_out = np.vstack((line_out, lines[ss]))
+
+    return side_out, line_out
 
 
 def _BuildLineDict(linelist='apohenear.dat'):
@@ -62,10 +65,10 @@ def _BuildLineDict(linelist='apohenear.dat'):
     # sort the lines, just in case the file is not sorted
     linewave.sort()
 
-    d = _MakeTris(linewave)
+    sides, lines = _MakeTris(linewave)
 
     # now, how to save this dict? or should we just return it?
-    return d
+    return sides, lines
 
 
 def LineHash(calimage, trim=True, linelist='apohenear.dat'):
@@ -145,54 +148,41 @@ def LineHash(calimage, trim=True, linelist='apohenear.dat'):
         wcent_pix[i] = xi[np.nanargmax(yi)]
 
     # build observed triangles from HeNeAr file, in wavelength units
-    tri = _MakeTris(wcent_pix)
+    tri_keys, tri_wave = _MakeTris(wcent_pix)
 
     # make the same observed tri using pixel units.
     # ** should correspond directly **
-    tri_pix = _MakeTris(pcent_pix)
+    _, tri_pix = _MakeTris(pcent_pix)
 
     # construct the standard object triangles (maybe could be restructured)
-    std = _BuildLineDict(linelist=linelist)
+    std_keys, std_wave = _BuildLineDict(linelist=linelist)
 
     # now step thru each observed "tri", see if it matches any in "std"
     # within some tolerance (maybe say 5% for all 3 ratios?)
-
     # the maximum cartesian distance in tri-space
     maxdist = 0.5 # this will need tuning!
 
     # for each observed tri
-    for i in range(0,len(tri)):
-        obs = tri.keys()[i]
+    for i in range(tri_keys.shape[0]):
+        obs = tri_keys[i,:]
         dist = []
         # search over every library tri, find nearest (BRUTE FORCE)
-        for j in range(0,len(std)):
-            ref = std.keys()[j]
-
-            dist.append( ((obs[0]-ref[0])**2. +
-                         (obs[1]-ref[1])**2. +
-                         (obs[2]-ref[2])**2.)**0.5 )
+        for j in range(std_keys.shape[0]):
+            ref = std_keys[j,:]
+            dist.append( np.sum((obs-ref)**2.)**0.5 )
 
         if (min(dist)<maxdist):
             indx = dist.index(min(dist))
             # replace the observed wavelengths with the catalog values
-            tri[tri.keys()[i]] = std.values()[indx]
+            tri_wave[i,:] = std_wave[indx,:]
         else:
             # need to do something better here too
-            tri[tri.keys()[i]] = [float('nan'), float('nan'), float('nan')]
+            tri_wave[i,:] = np.array([float('nan'), float('nan'), float('nan')])
 
-    # now use the matched tris, need to get back to wavelength vs pixel
-    out_wave = np.array([],dtype='float')
-    out_pix = np.array([],dtype='float')
+    ok = np.where((np.isfinite(tri_wave)))
 
-    for i in range(0,len(tri)):
-        if (np.isfinite(tri.values())[i].sum() > 0):
-            out_wave = np.concatenate((out_wave, tri[tri.keys()[i]]))
-            out_pix = np.concatenate((out_pix, tri_pix[tri.keys()[i]]))
-
-    ok = np.where((np.isfinite(out_wave)))
-
-    out_wave = out_wave[ok]
-    out_pix = out_pix[ok]
+    out_wave = tri_wave[ok]
+    out_pix = tri_pix[ok]
 
     out_wave.sort()
     out_pix.sort()

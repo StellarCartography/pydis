@@ -26,6 +26,7 @@ def _MakeTris(linewave0):
     linewave.sort()
 
     ntri = len(linewave)-2
+    k0 = 0
     for k in range(ntri):
         # the 3 lines
         l1,l2,l3 = linewave[k:k+3]
@@ -38,12 +39,14 @@ def _MakeTris(linewave0):
         lines = np.array([l1,l2,l3])
         ss = np.argsort(sides)
 
-        if (k==0):
-            side_out = sides[ss]
-            line_out = lines[ss]
-        else:
-            side_out = np.vstack((side_out, sides[ss]))
-            line_out = np.vstack((line_out, lines[ss]))
+        if np.isfinite(sides).sum() > 2:
+            if (k0==0):
+                side_out = sides[ss]
+                line_out = lines[ss]
+                k0=1
+            else:
+                side_out = np.vstack((side_out, sides[ss]))
+                line_out = np.vstack((line_out, lines[ss]))
 
     return side_out, line_out
 
@@ -107,57 +110,12 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
     hdu.close(closed=True)
 
     # take a slice thru the data (+/- 10 pixels) in center row of chip
-    slice = img[img.shape[0]/2-10:img.shape[0]/2+10,:].sum(axis=0)
+    slice = img[img.shape[0]/2-50:img.shape[0]/2+50,:].sum(axis=0)
 
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
 
-    '''
-    # the flux threshold to select peaks at
-    flux_thresh = np.percentile(slice, 90)
-
-    # find flux above threshold
-    high = np.where( (slice >= flux_thresh) )
-    # find  individual peaks (separated by > 1 pixel)
-    pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
-    # the number of pixels around the "peak" to fit over
-    pwidth = 10
-    # offset from start/end of array by at least same # of pixels
-    pk = pk[pk > pwidth]
-    pk = pk[pk < (len(slice)-pwidth)]
-
-    # the arrays to store the estimated peaks in
-    pcent_pix = np.zeros_like(pk,dtype='float')
-    wcent_pix = np.zeros_like(pk,dtype='float')
-
-    print(str(len(pk))+' peaks found to center')
-    # for each peak, fit a gaussian to find robust center
-    for i in range(len(pk)):
-        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
-        yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
-
-        pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-        try:
-            popt,pcov = curve_fit(pydis._gaus, np.arange(len(xi),dtype='float'), yi,
-                                  p0=pguess)
-            # the gaussian center of the line in pixel units
-            pcent_pix[i] = (pk[i]-pwidth) + popt[2]
-            # and the peak in approximate wavelength units
-            wcent_pix[i] = xi[np.nanargmax(yi)]
-
-        except RuntimeError:
-            print('> autoHeNeAr WARNING: could not center auto-found line')
-            # popt = np.array([float('nan'), float('nan'), float('nan'),float('nan')])
-
-            pcent_pix[i] = float('nan')
-            wcent_pix[i] = float('nan')
-
-    okcent = np.where((np.isfinite(pcent_pix)))
-    pcent_pix = pcent_pix[okcent]
-    wcent_pix = wcent_pix[okcent]
-    '''
-
-    pcent_pix, wcent_pix = pydis.find_peaks(wtemp, slice, pwidth=10, pthreshold=90)
+    pcent_pix, wcent_pix = pydis.find_peaks(wtemp, slice, pwidth=15, pthreshold=90)
 
     # build observed triangles from HeNeAr file, in wavelength units
     tri_keys, tri_wave = _MakeTris(wcent_pix)
@@ -197,13 +155,21 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
     out_wave.sort()
     out_pix.sort()
 
+    xcent_big, ycent_big, wcent_big = pydis.line_trace(img, out_pix, out_wave,
+                                                       fmask=fmask,display=True)
+
+    wfit = pydis.lines_to_surface(img, xcent_big, ycent_big, wcent_big,
+                            mode='spline')
+
     if display is True:
         plt.plot()
         plt.scatter(out_pix, out_wave)
+        plt.plot(out_pix,
+                 pydis.mapwavelength(np.ones_like(out_pix)*img.shape[0]/2,
+                                     wfit, mode='spline'))
         plt.title('autoHeNeAr Find')
         plt.xlabel('Pixel')
         plt.ylabel('Wavelength')
         plt.show()
 
-    wfit = pydis.line_trace(img, out_pix, out_wave, fmask=fmask)
     return wfit

@@ -25,6 +25,7 @@ from scipy.optimize import curve_fit
 import scipy.signal
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
+import warnings
 
 # import datetime
 # from matplotlib.widgets import SpanSelector
@@ -493,6 +494,16 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
 
 
 def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
+    '''
+    Trace the lines
+    :param img:
+    :param pcent:
+    :param wcent:
+    :param fmask:
+    :param maxbend:
+    :param display:
+    :return:
+    '''
     xcent_big = []
     ycent_big = []
     wcent_big = []
@@ -503,9 +514,17 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
     else:
         ydata = np.arange(img.shape[0])
 
+    ybuf = 10
     # split the chip in to 2 parts, above and below the center
-    ydata1 = ydata[np.where((ydata>=img.shape[0]/2))]
-    ydata2 = ydata[np.where((ydata<img.shape[0]/2))][::-1]
+    ydata1 = ydata[np.where((ydata>=img.shape[0]/2) &
+                            (ydata<img.shape[0]-ybuf))]
+    ydata2 = ydata[np.where((ydata<img.shape[0]/2) &
+                            (ydata>ybuf))][::-1]
+
+    # plt.figure()
+    # plt.plot(img[img.shape[0]/2,:])
+    # plt.scatter(pcent, pcent*0.+np.mean(img))
+    # plt.show()
 
     img_med = np.median(img)
     # loop over every HeNeAr peak that had a good fit
@@ -515,38 +534,44 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
 
         # above center line (where fit was done)
         for j in ydata1:
-            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
+            yline = img[j-ybuf:j+ybuf, int(pcent[i])-maxbend:int(pcent[i])+maxbend].sum(axis=0)
             # fit gaussian, assume center at 0, width of 2
             if j==ydata1[0]:
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
-            pguess = [np.nanmax(yline),img_med,cguess,2.]
+            pguess = [np.nanmax(yline), img_med, cguess, 2.]
             try:
                 popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+
+                if popt[2]>0 and popt[2]<img.shape[1]:
+                    cguess = popt[2] # update center pixel
+
+                    xcent_big = np.append(xcent_big, popt[2])
+                    ycent_big = np.append(ycent_big, j)
+                    wcent_big = np.append(wcent_big, wcent[i])
             except RuntimeError:
                 popt = pguess
-            cguess = popt[2] # update center pixel
 
-            xcent_big = np.append(xcent_big, popt[2])
-            ycent_big = np.append(ycent_big, j)
-            wcent_big = np.append(wcent_big, wcent[i])
         # below center line, from middle down
         for j in ydata2:
-            yline = img[j, int(pcent[i])-maxbend:int(pcent[i])+maxbend]
+            yline = img[j-ybuf:j+ybuf, int(pcent[i])-maxbend:int(pcent[i])+maxbend].sum(axis=0)
             # fit gaussian, assume center at 0, width of 2
-            if j==ydata1[0]:
+            if j==ydata2[0]:
                 cguess = pcent[i] # xline[np.argmax(yline)]
 
-            pguess = [np.nanmax(yline),img_med,cguess,2.]
+            pguess = [np.nanmax(yline), img_med, cguess, 2.]
             try:
                 popt,pcov = curve_fit(_gaus, xline, yline, p0=pguess)
+
+                if popt[2]>0 and popt[2]<img.shape[1]:
+                    cguess = popt[2] # update center pixel
+
+                    xcent_big = np.append(xcent_big, popt[2])
+                    ycent_big = np.append(ycent_big, j)
+                    wcent_big = np.append(wcent_big, wcent[i])
             except RuntimeError:
                 popt = pguess
-            cguess = popt[2] # update center pixel
 
-            xcent_big = np.append(xcent_big, popt[2])
-            ycent_big = np.append(ycent_big, j)
-            wcent_big = np.append(wcent_big, wcent[i])
 
     if display is True:
         plt.figure()
@@ -580,7 +605,6 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
     # find  individual peaks (separated by > 1 pixel)
     pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
 
-
     # offset from start/end of array by at least same # of pixels
     pk = pk[pk > pwidth]
     pk = pk[pk < (len(slice)-pwidth)]
@@ -610,6 +634,55 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
 
     okcent = np.where((np.isfinite(pcent_pix)))
     return pcent_pix[okcent], wcent_pix[okcent]
+
+
+def lines_to_surface(img, xcent_big, ycent_big, wcent_big, mode='poly', fit_order=2):
+    '''
+    Turn arc lines into a wavelength solution across the entire chip
+
+    '''
+
+    xsz = img.shape[1]
+
+    #  fit the wavelength solution for the entire chip w/ a 2d spline
+    if (mode=='spline2d'):
+        xfitd = 5 # the spline dimension in the wavelength space
+        print('Fitting Spline2d - NOTE: this mode doesnt work well')
+        wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
+                                     bbox=[0,img.shape[1],0,img.shape[0]],s=0 )
+
+    #elif mode=='poly2d':
+    ## using 2d polyfit
+        # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
+
+    elif mode=='spline':
+        wfit = np.zeros_like(img)
+        xpix = np.arange(xsz)
+
+        for i in np.arange(ycent_big.min(), ycent_big.max()):
+            x = np.where((ycent_big==i))
+
+            x_u, ind_u = np.unique(xcent_big[x], return_index=True)
+
+            # this smoothing parameter is absurd...
+            spl = UnivariateSpline(x_u, wcent_big[x][ind_u], ext=0, k=2, s=5e7)
+
+            plt.figure()
+            plt.scatter(xcent_big[x][ind_u], wcent_big[x][ind_u])
+            plt.plot(xpix, spl(xpix))
+            plt.show()
+
+            wfit[i,:] = spl(xpix)
+
+    elif mode=='poly':
+        wfit = np.zeros_like(img)
+        xpix = np.arange(xsz)
+
+        for i in np.arange(ycent_big.min(), ycent_big.max()):
+            x = np.where((ycent_big==i))
+            coeff = np.polyfit(xcent_big[x], wcent_big[x], fit_order)
+            wfit[i,:] = np.polyval(coeff, xpix)
+    return wfit
 
 
 def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
@@ -768,6 +841,9 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
     print('Running HeNeAr_fit function on file '+calimage)
 
+    # silence the polyfit warnings
+    warnings.simplefilter('ignore', np.RankWarning)
+
     hdu = fits.open(calimage)
     if trim is False:
         img = hdu[0].data
@@ -815,58 +891,6 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         linewave = np.loadtxt(dir + linelist,dtype='float',
                               skiprows=1,usecols=(0,),unpack=True)
 
-        '''
-        # sort data, cut top x% of flux data as peak threshold
-        flux_thresh = np.percentile(slice, 97)
-
-        # find flux above threshold
-        high = np.where( (slice >= flux_thresh) )
-
-        # find  individual peaks (separated by > 1 pixel)
-        pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
-
-        # the number of pixels around the "peak" to fit over
-        pwidth = 10
-        # offset from start/end of array by at least same # of pixels
-        pk = pk[pk > pwidth]
-        pk = pk[pk < (len(slice)-pwidth)]
-
-        print('Found '+str(len(pk))+' peaks in HeNeAr to try')
-
-        if display is True:
-            plt.figure()
-            plt.plot(wtemp, slice, 'b')
-            plt.plot(wtemp, np.ones_like(slice)*np.median(slice))
-            plt.plot(wtemp, np.ones_like(slice) * flux_thresh)
-
-        pcent_pix = np.zeros_like(pk,dtype='float')
-        wcent_pix = np.zeros_like(pk,dtype='float') # wtemp[pk]
-        # for each peak, fit a gaussian to find center
-        for i in range(len(pk)):
-            xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
-            yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
-
-            pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-            popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
-                                  p0=pguess)
-
-            # the gaussian center of the line in pixel units
-            pcent_pix[i] = (pk[i]-pwidth) + popt[2]
-            # and the peak in wavelength units
-            wcent_pix[i] = xi[np.nanargmax(yi)]
-
-            if display is True:
-                plt.scatter(wtemp[pk][i], slice[pk][i], marker='o')
-                plt.plot(xi, _gaus(np.arange(len(xi)),*popt), 'r')
-        if display is True:
-            plt.xlabel('approx. wavelength')
-            plt.ylabel('flux')
-            #plt.show()
-
-        if display is True:
-            plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='blue')
-            plt.show()
-        '''
 
         pcent_pix, wcent_pix = find_peaks(wtemp, slice, pwidth=10, pthreshold=97)
 
@@ -1103,42 +1127,6 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
         tol2 = tol # / 2.0
 
-        '''
-        # use a lower flux threshold to go after smaller ampl peaks
-        flux_thresh2 = np.percentile(slice, 80)
-        pwidth = 10
-
-        high2 = np.where( (slice >= flux_thresh2) )
-        pk2 = high2[0][ ( (high2[0][1:]-high2[0][:-1]) > 1 ) ]
-
-        pk2 = pk2[pk2 > pwidth]
-        pk2 = pk2[pk2 < (len(slice)-pwidth)]
-        print('Found '+str(len(pk2))+' peaks in HeNeAr to take 2nd pass fit over')
-
-        pcent_pix2 = np.zeros_like(pk2,dtype='float')
-        wcent_pix2 = np.zeros_like(pk2,dtype='float')
-        # for each peak, fit a gaussian to find center
-        for i in range(len(pk2)):
-            xi = wtemp[pk2[i]-pwidth:pk2[i]+pwidth*2]
-            yi = slice[pk2[i]-pwidth:pk2[i]+pwidth*2]
-
-            pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
-            try:
-                popt,pcov = curve_fit(_gaus, np.arange(len(xi), dtype='float'),
-                                      yi, p0=pguess)
-                # the gaussian center of the line in pixel units
-                pcent_pix2[i] = (pk2[i]-pwidth) + popt[2]
-                # and the peak in wavelength units
-                wcent_pix2[i] = xi[np.nanargmax(yi)]
-            except RuntimeError:
-                pcent_pix2[i] = -9999
-                wcent_pix2[i] = -9999
-
-        # remove points w/ bad fits
-        ok = np.where((pcent_pix2 > -9999))
-        pcent_pix2 = pcent_pix2[ok]
-        wcent_pix2 = wcent_pix2[ok]
-        '''
         pcent_pix2, wcent_pix2 = find_peaks(wtemp, slice, pwidth=10, pthreshold=80)
 
         pcent2 = []
@@ -1225,29 +1213,13 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                 print(' ')
                 done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
 
-
     #-- trace the peaks vertically --
     xcent_big, ycent_big, wcent_big = line_trace(img, pcent, wcent,
                                                  fmask=fmask, display=display)
 
-    #  fit the wavelength solution for the entire chip w/ a 2d spline
-    if mode=='spline2d':
-        xfitd = 5 # the spline dimension in the wavelength space
-        print('Fitting Spline!')
-        wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
-                                     bbox=[0,img.shape[1],0,img.shape[0]],s=0 )
-    #elif mode=='poly2d':
-    ## using 2d polyfit
-        # wfit = polyfit2d(xcent_big, ycent_big, wcent_big, order=3)
-
-    elif mode=='poly':
-        wfit = np.zeros_like(img)
-        xpix = np.arange(len(slice))
-
-        for i in np.arange(ycent_big.min(), ycent_big.max()):
-            x = np.where((ycent_big==i))
-            coeff = np.polyfit(xcent_big[x], wcent_big[x], fit_order)
-            wfit[i,:] = np.polyval(coeff, xpix)
+    #-- turn these vertical traces in to a whole chip wavelength solution
+    wfit = lines_to_surface(img, xcent_big, ycent_big, wcent_big,
+                            mode=mode, fit_order=fit_order)
 
     return wfit
 
@@ -1273,7 +1245,8 @@ def mapwavelength(trace, wavemap, mode='poly'):
     # use the wavemap from the HeNeAr_fit routine to determine the wavelength along the trace
     if mode=='spline2d':
         trace_wave = wavemap.ev(np.arange(len(trace)), trace)
-    elif mode=='poly':
+
+    elif mode=='poly' or mode=='spline':
         trace_wave = np.zeros_like(trace)
         for i in range(len(trace)):
             trace_wave[i] = np.interp(trace[i], range(wavemap.shape[0]), wavemap[:,i])

@@ -1,6 +1,6 @@
 from .pydis import (OpenImg, ap_trace, ap_extract, HeNeAr_fit,
                     mapwavelength, biascombine, flatcombine,
-                    line_trace, find_peaks,
+                    line_trace, find_peaks, lines_to_surface,
                     normalize, DefFluxCal, ApplyFluxCal, AirmassCor)
 
 

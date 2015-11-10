@@ -885,10 +885,10 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
         dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         # if (len(linelist)==0):
-        #     linelist = dir +linelist
+        #     linelist = os.path.join(dir, linelist)
 
         # import the linelist
-        linewave = np.loadtxt(dir + linelist,dtype='float',
+        linewave = np.loadtxt(os.path.join(dir, linelist), dtype='float',
                               skiprows=1,usecols=(0,),unpack=True)
 
 
@@ -1122,7 +1122,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
     if second_pass is True:
         dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         hireslinelist = 'henear.dat'
-        linewave2 = np.loadtxt(dir + hireslinelist, dtype='float',
+        linewave2 = np.loadtxt(os.path.join(dir, hireslinelist), dtype='float',
                                skiprows=1, usecols=(0,), unpack=True)
 
         tol2 = tol # / 2.0
@@ -1326,12 +1326,12 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     # read in the airmass extinction curve
     dir = os.path.dirname(os.path.realpath(__file__))+'/resources/'
     if len(airmass_file)==0:
-        air_wave, air_cor = np.loadtxt(dir+airmass_file,
+        air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
                                        unpack=True,skiprows=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
         # print('  Note: first 2 rows are skipped, assuming header')
-        air_wave, air_cor = np.loadtxt(dir+airmass_file,
+        air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
                                        unpack=True,skiprows=2)
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
@@ -1373,7 +1373,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     dir = os.path.dirname(os.path.realpath(__file__)) + \
           '/resources/onedstds/'
 
-    if os.path.isfile(dir + stdstar2):
+    if os.path.isfile(os.path.join(dir, stdstar2)):
         std_wave, std_mag, std_wth = np.loadtxt(dir + stdstar2,
                                                 skiprows=1, unpack=True)
         # standard star spectrum is stored in magnitude units
@@ -1459,7 +1459,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     else:
         sensfunc2 = np.zeros_like(obj_wave)
         print('ERROR: in DefFluxCal no valid standard star file found at ')
-        print(dir + stdstar2)
+        print(os.path.join(dir, stdstar2))
 
     return 10**sensfunc2
 

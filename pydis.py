@@ -1034,7 +1034,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                                     self.ax.plot(wtemp[int(popt[2])], popt[0], 'ro')
                                     print('  Saving '+str(number))
                                 except ValueError:
-                                    print "> Warning: Not a valid wavelength float!"
+                                    print("> Warning: Not a valid wavelength float!")
 
                             elif (kill is None):
                                 print('> Error: No valid data near click!')

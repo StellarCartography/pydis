@@ -85,7 +85,7 @@ def _CheckMono(wave):
     return
 
 
-class OpenImg:
+class OpenImg(object):
     """
     A simple wrapper for astropy.io.fits (pyfits) to open and extract
     the data we want from images and headers.
@@ -401,7 +401,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
 
     #-- allow interactive mode, if mult obj on slit
     if interac is True and recenter is False:
-        class InteracTrace:
+        class InteracTrace(object):
             def __init__(self):
                 self.fig = plt.figure()
                 self.ax = self.fig.add_subplot(111)
@@ -957,7 +957,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             print('4) Close plot window when finished')
 
             xraw = np.arange(len(slice))
-            class InteracWave:
+            class InteracWave(object):
                 # http://stackoverflow.com/questions/21688420/callbacks-for-graphical-mouse-input-how-to-refresh-graphics-how-to-tell-matpl
                 def __init__(self):
                     self.fig = plt.figure()

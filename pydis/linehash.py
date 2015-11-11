@@ -15,13 +15,25 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 
-
 def _MakeTris(linewave0):
     '''
+    An internal function to be used with _BuildLineDict
 
-    :param linewave0:
-    :return:
+    Takes a list of line wavelengths and creates "Tri's", or sets of 3 neighboring
+    lines. Ratios of the line separations are computed, and sorted within each Tri
+    to make a unique set of ratios for these lines.
+
+    Parameters
+    ----------
+    linewave0 : float array
+        This is the input list of lines
+
+    Returns
+    -------
+    side_out, line_out
+        The sides of the Tri's (line separation ratios) and actual lines
     '''
+
     linewave = linewave0.copy()
     linewave.sort()
 
@@ -53,7 +65,7 @@ def _MakeTris(linewave0):
 
 def _BuildLineDict(linelist='apohenear.dat'):
     '''
-    Build the dictionary (hash table) of lines from the master file.
+    Build the dictionary (sorta hash table) of lines from the master file.
 
     Goal is to do this once, store it in some hard file form for users.
     Users then would only re-run this function if linelist changed, say if

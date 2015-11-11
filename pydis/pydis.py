@@ -130,15 +130,14 @@ class OpenImg(object):
         else:
             self.data = hdu[0].data
 
-        try:
+        if 'AIRMASS' in hdu[0].header:
             self.airmass = hdu[0].header['AIRMASS']
-        except KeyError:
-            try:
-                # try using the Zenith Distance (assume in degrees)
-                ZD = hdu[0].header['ZD'] / 180.0 * np.pi
-                self.airmass = 1.0/np.cos(ZD) # approximate airmass
-            except KeyError:
-                self.airmass = 1.0
+        elif 'ZD' in hdu[0].header:
+            # try using the Zenith Distance (assume in degrees)
+            ZD = hdu[0].header['ZD'] / 180.0 * np.pi
+            self.airmass = 1.0/np.cos(ZD) # approximate airmass
+        else:
+            self.airmass = 1.0
 
         # compute the approximate wavelength solution
         try:

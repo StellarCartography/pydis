@@ -171,7 +171,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
 
     # assume biaslist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
-    files = np.loadtxt(biaslist,dtype='string')
+    files = np.loadtxt(biaslist, dtype='S')
 
     for i in range(0,len(files)):
         hdu_i = fits.open(files[i])
@@ -268,7 +268,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
 
     # assume flatlist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
-    files = np.loadtxt(flatlist,dtype='string')
+    files = np.loadtxt(flatlist, dtype='S')
 
     for i in range(0,len(files)):
         hdu_i = fits.open(files[i])

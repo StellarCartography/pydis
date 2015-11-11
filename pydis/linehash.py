@@ -63,7 +63,7 @@ def _MakeTris(linewave0):
     return side_out, line_out
 
 
-def _BuildLineDict(linelist='apohenear.dat'):
+def _BuildLineDict(linelist):
     '''
     Build the dictionary (sorta hash table) of lines from the master file.
 
@@ -72,10 +72,8 @@ def _BuildLineDict(linelist='apohenear.dat'):
     a different set of lamps were used.
     '''
 
-    dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
-
-    linewave = np.loadtxt(dir + linelist, dtype='float',
-                           skiprows=1, usecols=(0,), unpack=True)
+    linewave = np.loadtxt(linelist, dtype='float',
+                          skiprows=1, usecols=(0,), unpack=True)
 
     # sort the lines, just in case the file is not sorted
     linewave.sort()
@@ -137,7 +135,8 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
     _, tri_pix = _MakeTris(pcent_pix)
 
     # construct the standard object triangles (maybe could be restructured)
-    std_keys, std_wave = _BuildLineDict(linelist=linelist)
+    dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+    std_keys, std_wave = _BuildLineDict(dir + linelist)
 
     # now step thru each observed "tri", see if it matches any in "std"
     # within some tolerance (maybe say 5% for all 3 ratios?)

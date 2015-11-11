@@ -33,9 +33,25 @@ import warnings
 
 
 def _mag2flux(wave, mag, zeropt=48.60):
-    # NOTE: onedstds are stored in AB_mag units,
-    # so use AB_mag zeropt by default. Convert to
-    # PHOTFLAM units for flux!
+    '''
+    Convert magnitudes to flux units. This is important for dealing with standards
+    and files from IRAF, which are stored in AB mag units. To be clear, this converts
+    to "PHOTFLAM" units in IRAF-speak. Assumes the common flux zeropoint used in IRAF
+
+    Parameters
+    ----------
+    wave : 1d numpy array
+        The wavelength of the data points
+    mag : 1d numpy array
+        The magnitudes of the data
+    zeropt : float, optional
+        Conversion factor for mag->flux. (Default is 48.60)
+
+    Returns
+    -------
+    Flux values!
+    '''
+
     c = 2.99792458e18 # speed of light, in A/s
     flux = 10.0**( (mag + zeropt) / (-2.5) )
     return flux * (c / wave**2.0)

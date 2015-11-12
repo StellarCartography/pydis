@@ -1,6 +1,8 @@
 # *pyDIS*
 An easy to use reduction package for one dimensional longslit spectroscopy using Python. 
 
+![](dis2007.jpg)
+
 The goal of *pyDIS* is to provide a turn-key solution for reducing and understanding longslit spectroscopy, which could ideally be done in real time. Currently we are using many simple assumptions to get a quick-and-dirty solution, and modeling the workflow after the robust industry standards set by IRAF. Additionally, we have only used data from the low/medium resolution [APO 3.5-m](http://www.apo.nmsu.edu) "Dual Imaging Spectrograph" (DIS). Therefore, many instrument specific assumptions are being made.
 
 Some more background on this package is [given here](http://jradavenport.github.io/2015/04/01/spectra.html).

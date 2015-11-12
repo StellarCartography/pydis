@@ -9,6 +9,9 @@ setup(
     license = 'MIT',
     url = 'https://github.com/jradavenport/pydis',
     packages = ['pydis'],
+    package_data = {
+	'': ['resources/*.dat', 'resources/linelists/*.dat'],
+    },
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         # How mature is the project?

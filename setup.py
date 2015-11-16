@@ -1,4 +1,12 @@
 from setuptools import setup
+import os
+
+# include data files
+pydis_data = []
+for dirpath, dirnames, files in os.walk('pydis/resources'):
+    for f in files:
+        if f.endswith('.dat'):
+            pydis_data.append(os.path.join(dirpath[6:], f))
 
 setup(
     name = 'pydis',
@@ -10,7 +18,7 @@ setup(
     url = 'https://github.com/jradavenport/pydis',
     packages = ['pydis'],
     package_data = {
-	'': ['resources/*.dat', 'resources/linelists/*.dat'],
+	'': pydis_data,
     },
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[

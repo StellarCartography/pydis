@@ -33,7 +33,7 @@ So far *pyDIS* can do a rough job of all the reduction tasks for single point so
 
 ![Imgur](http://i.imgur.com/4Y55NZHl.png)
 
-**This spectrum took a few second to reduce, and is good enough for a quick-look!** There are defintely errors in the wavelength, and small offsets in the flux calibration. A (terrible) brute-force wavelength solution, and sometimes fickle flux calibration are being used here. With some minimal parameter tweaking and manual lamp-line identifications the results are even better!
+**This spectrum took a few seconds to reduce, and is good enough for a quick-look!** There are definitely errors in the wavelength, and small offsets in the flux calibration. A (terrible) brute-force wavelength solution, and sometimes fickle flux calibration are being used here. With some minimal parameter tweaking and manual lamp-line identifications the results are even better!
 
 
 

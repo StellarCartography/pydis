@@ -1325,8 +1325,8 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     ----------
     obj_wave : 1-d array
         The 1-d wavelength array of the spectrum
-    obj_flux : 1-d array
-        The 1-d flux array of the spectrum
+    obj_flux : 1-d or 2-d array
+        The 1-d or 2-d flux array of the spectrum
     airmass : float
         The value of the airmass, not the header keyword.
     airmass_file : str, optional
@@ -1340,7 +1340,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     The flux array
     """
     # read in the airmass extinction curve
-    dir = os.path.dirname(os.path.realpath(__file__))+'/resources/'
+    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources')
     if len(airmass_file)==0:
         air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
                                        unpack=True,skiprows=2)
@@ -1352,6 +1352,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
                          np.interp(obj_wave, air_wave, air_cor))
+    # arimas_ext is broadcast to obj_flux if it is a 2-d array
     return obj_flux * airmass_ext
 
 

@@ -359,7 +359,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     Trace the spectrum aperture in an image
 
     Assumes wavelength axis is along the X, spatial axis along the Y.
-    Chops image up in bix along the wavelength direction, fits a Gaussian
+    Chops image up in bins along the wavelength direction, fits a Gaussian
     within each bin to determine the spatial center of the trace. Finally,
     draws a cubic spline through the bins to up-sample the trace.
 
@@ -727,8 +727,9 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
         The spatial positions (Y axis) corresponding to the center of the
         trace for every wavelength (X axis), as returned from ap_trace
     apwidth : int, optional
-        The width along the Y axis of the trace to extract. Note: a fixed
-        width is used along the whole trace. (default is 8 pixels)
+        The width along the Y axis on either side of the trace to extract.
+        Note: a fixed width is used along the whole trace.
+        (default is 8 pixels)
     skysep : int, optional
         The separation in pixels from the aperture to the sky window.
         (Default is 3)

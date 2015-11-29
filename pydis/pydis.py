@@ -385,6 +385,8 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         position. Currently only allows linear shift (Default is False)
     bigbox : float, optional
         The number of sigma away from the main aperture to allow to trace
+    display : bool, optional
+        If set to true display the trace over-plotted on the image
 
     Returns
     -------

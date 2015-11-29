@@ -501,6 +501,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     if display is True:
         plt.figure()
         plt.imshow(np.log10(img),origin='lower',aspect='auto',cmap=cm.Greys_r)
+        plt.autoscale(False)
         plt.plot(mx,my,'b',lw=1)
         # plt.plot(mx,my+popt_tot[3]*bigbox,'y')
         # plt.plot(mx,my-popt_tot[3]*bigbox,'y')

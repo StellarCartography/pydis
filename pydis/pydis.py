@@ -728,16 +728,16 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
         trace for every wavelength (X axis), as returned from ap_trace
     apwidth : int, optional
         The width along the Y axis of the trace to extract. Note: a fixed
-        width is used along the whole trace. (default is 5 pixels)
+        width is used along the whole trace. (default is 8 pixels)
     skysep : int, optional
         The separation in pixels from the aperture to the sky window.
-        (Default is 25)
+        (Default is 3)
     skywidth : int, optional
         The width in pixels of the sky windows on either side of the
-        aperture. (Default is 75)
+        aperture. (Default is 7)
     skydeg : int, optional
         The polynomial order to fit between the sky windows.
-        (Default is 2)
+        (Default is 0)
 
     Returns
     -------

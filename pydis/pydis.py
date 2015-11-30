@@ -766,28 +766,28 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
             widthdn = trace[i] - 1
 
         # simply add up the total flux around the trace +/- width
-        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup, i].sum()
+        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup+1, i].sum()
 
         #-- now do the sky fit
         itrace = int(trace[i])
         y = np.append(np.arange(itrace-apwidth-skysep-skywidth, itrace-apwidth-skysep),
-                      np.arange(itrace+apwidth+skysep, itrace+apwidth+skysep+skywidth))
+                      np.arange(itrace+apwidth+skysep+1, itrace+apwidth+skysep+skywidth+1))
 
         z = img[y,i]
         if (skydeg>0):
             # fit a polynomial to the sky in this column
             pfit = np.polyfit(y,z,skydeg)
             # define the aperture in this column
-            ap = np.arange(trace[i]-apwidth, trace[i]+apwidth)
+            ap = np.arange(trace[i]-apwidth, trace[i]+apwidth+1)
             # evaluate the polynomial across the aperture, and sum
             skysubflux[i] = np.sum(np.polyval(pfit, ap))
         elif (skydeg==0):
-            skysubflux[i] = np.mean(z)*apwidth*2.0
+            skysubflux[i] = np.mean(z)*(apwidth*2.0 + 1)
 
         #-- finally, compute the error in this pixel
         sigB = np.std(z) # stddev in the background data
         N_B = len(y) # number of bkgd pixels
-        N_A = apwidth*2. # number of aperture pixels
+        N_A = apwidth*2. + 1 # number of aperture pixels
 
         # based on aperture phot err description by F. Masci, Caltech:
         # http://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf

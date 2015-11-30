@@ -359,7 +359,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     Trace the spectrum aperture in an image
 
     Assumes wavelength axis is along the X, spatial axis along the Y.
-    Chops image up in bix along the wavelength direction, fits a Gaussian
+    Chops image up in bins along the wavelength direction, fits a Gaussian
     within each bin to determine the spatial center of the trace. Finally,
     draws a cubic spline through the bins to up-sample the trace.
 
@@ -385,6 +385,8 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         position. Currently only allows linear shift (Default is False)
     bigbox : float, optional
         The number of sigma away from the main aperture to allow to trace
+    display : bool, optional
+        If set to true display the trace over-plotted on the image
 
     Returns
     -------
@@ -499,6 +501,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     if display is True:
         plt.figure()
         plt.imshow(np.log10(img),origin='lower',aspect='auto',cmap=cm.Greys_r)
+        plt.autoscale(False)
         plt.plot(mx,my,'b',lw=1)
         # plt.plot(mx,my+popt_tot[3]*bigbox,'y')
         # plt.plot(mx,my-popt_tot[3]*bigbox,'y')
@@ -727,17 +730,18 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
         The spatial positions (Y axis) corresponding to the center of the
         trace for every wavelength (X axis), as returned from ap_trace
     apwidth : int, optional
-        The width along the Y axis of the trace to extract. Note: a fixed
-        width is used along the whole trace. (default is 5 pixels)
+        The width along the Y axis on either side of the trace to extract.
+        Note: a fixed width is used along the whole trace.
+        (default is 8 pixels)
     skysep : int, optional
         The separation in pixels from the aperture to the sky window.
-        (Default is 25)
+        (Default is 3)
     skywidth : int, optional
         The width in pixels of the sky windows on either side of the
-        aperture. (Default is 75)
+        aperture. (Default is 7)
     skydeg : int, optional
         The polynomial order to fit between the sky windows.
-        (Default is 2)
+        (Default is 0)
 
     Returns
     -------
@@ -1324,8 +1328,8 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     ----------
     obj_wave : 1-d array
         The 1-d wavelength array of the spectrum
-    obj_flux : 1-d array
-        The 1-d flux array of the spectrum
+    obj_flux : 1-d or 2-d array
+        The 1-d or 2-d flux array of the spectrum
     airmass : float
         The value of the airmass, not the header keyword.
     airmass_file : str, optional
@@ -1339,7 +1343,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     The flux array
     """
     # read in the airmass extinction curve
-    dir = os.path.dirname(os.path.realpath(__file__))+'/resources/'
+    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources')
     if len(airmass_file)==0:
         air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
                                        unpack=True,skiprows=2)
@@ -1351,6 +1355,7 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
                          np.interp(obj_wave, air_wave, air_cor))
+    # arimas_ext is broadcast to obj_flux if it is a 2-d array
     return obj_flux * airmass_ext
 
 

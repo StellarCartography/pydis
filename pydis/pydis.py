@@ -1366,7 +1366,9 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     Parameters
     ----------
     obj_wave : 1-d array
+        The 1-d wavelength array of the spectrum
     obj_flux : 1-d array
+        The 1-d flux array of the spectrum
     stdstar : str
         Name of the standard star file to use for flux calibration. You
         must give the subdirectory and file name, for example:
@@ -1386,21 +1388,22 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
 
     Returns
     -------
-    sensfunc
+    sensfunc : 1-d array
+        The sensitivity function for the standard star
 
     """
     stdstar2 = stdstar.lower()
-    dir = os.path.dirname(os.path.realpath(__file__)) + \
-          '/resources/onedstds/'
+    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        'resources', 'onedstds')
 
     if os.path.isfile(os.path.join(dir, stdstar2)):
-        std_wave, std_mag, std_wth = np.loadtxt(dir + stdstar2,
+        std_wave, std_mag, std_wth = np.loadtxt(os.path.join(dir, stdstar2),
                                                 skiprows=1, unpack=True)
         # standard star spectrum is stored in magnitude units
         std_flux = _mag2flux(std_wave, std_mag)
 
         # Automatically exclude these obnoxious lines...
-        balmer = np.array([6563, 4861, 4341],dtype='float')
+        balmer = np.array([6563, 4861, 4341], dtype='float')
 
         # down-sample (ds) the observed flux to the standard's bins
         obj_flux_ds = []
@@ -1423,15 +1426,15 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
 
         # the ratio between the standard star flux and observed flux
         # has units like erg / counts
-        ratio = np.abs(np.array(std_flux_ds,dtype='float') /
-                       np.array(obj_flux_ds,dtype='float'))
+        ratio = np.abs(np.array(std_flux_ds, dtype='float') /
+                       np.array(obj_flux_ds, dtype='float'))
 
 
         # interp calibration (sensfunc) on to object's wave grid
         # can use 3 types of interpolations: linear, cubic spline, polynomial
 
         # if invalid mode selected, make it spline
-        if (mode != 'linear') and (mode != 'spline') and (mode != 'poly'):
+        if not mode in ('linear', 'spline', 'poly'):
             mode = 'spline'
             print("WARNING: invalid mode set in DefFluxCal. Changing to spline")
 

@@ -1454,30 +1454,36 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
 
         if display is True:
             plt.figure()
-            plt.plot(std_wave, std_flux, 'r', alpha=0.5)
+            plt.plot(std_wave, std_flux, 'r', alpha=0.5, label='standard flux')
             plt.xlabel('Wavelength')
             plt.ylabel('Standard Star Flux')
+            plt.legend()
             plt.show()
 
             plt.figure()
-            plt.plot(obj_wave, obj_flux,'k')
-            plt.plot(obj_wave_ds, obj_flux_ds,'bo')
+            plt.plot(obj_wave, obj_flux, 'k', label='observed counts')
+            plt.plot(obj_wave_ds, obj_flux_ds, 'bo',
+                    label='downsample observed')
             plt.xlabel('Wavelength')
             plt.ylabel('Observed Counts/S')
+            plt.legend()
             plt.show()
 
             plt.figure()
-            plt.plot(obj_wave_ds, LogSensfunc,'ko')
-            plt.plot(obj_wave, sensfunc2)
+            plt.plot(obj_wave_ds, LogSensfunc, 'ko', label='sensfunc')
+            plt.plot(obj_wave, sensfunc2, label='interpolated sensfunc')
             plt.xlabel('Wavelength')
             plt.ylabel('log Sensfunc')
+            plt.legend()
             plt.show()
 
             plt.figure()
-            plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k')
-            plt.plot(std_wave, std_flux, 'ro', alpha=0.5)
+            plt.plot(obj_wave, obj_flux*(10**sensfunc2),'k',
+                        label='applied sensfunc')
+            plt.plot(std_wave, std_flux, 'ro', alpha=0.5, label='standard flux')
             plt.xlabel('Wavelength')
             plt.ylabel('Standard Star Flux')
+            plt.legend()
             plt.show()
     else:
         sensfunc2 = np.zeros_like(obj_wave)

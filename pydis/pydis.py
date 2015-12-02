@@ -57,9 +57,28 @@ def _mag2flux(wave, mag, zeropt=48.60):
     return flux * (c / wave**2.0)
 
 
-def _gaus(x,a,b,x0,sigma):
-    """ Simple Gaussian function, for internal use only """
-    return a*np.exp(-(x-x0)**2/(2*sigma**2))+b
+def _gaus(x, a, b, x0, sigma):
+    """
+    Simple Gaussian function, for internal use only
+
+    Parameters
+    ----------
+    x : float or 1-d numpy array
+        The data to evaluate the Gaussian over
+    a : float
+        the amplitude
+    b : float
+        the constant offset
+    x0 : float
+        the center of the Gaussian
+    sigma : float
+        the width of the Gaussian
+
+    Returns
+    -------
+    Array or float of same type as input (x).
+    """
+    return a * np.exp(-(x - x0)**2 / (2 * sigma**2)) + b
 
 
 def _WriteSpec(spec, wfinal, ffinal, efinal, trace):

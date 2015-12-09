@@ -1353,16 +1353,19 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
         The value of the airmass, not the header keyword.
     airmass_file : str, optional
         The name of the airmass extinction file. This routine assumes
-        the file is stored in the resources/ subdirectory. Available files
-        are: apoextinct.dat, kpnoextinct.dat, ctioextinct.dat
-        (Default is apoextinct.dat)
+        the file is stored in the resources/extinction/ subdirectory.
+        Available files are (Default is apoextinct.dat):
+            apoextinct.dat
+            ctioextinct.dat
+            kpnoextinct.dat
+            ormextinct.dat
 
     Returns
     -------
     The flux array
     """
     # read in the airmass extinction curve
-    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources')
+    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources/extinction')
     if len(airmass_file)==0:
         air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
                                        unpack=True,skiprows=2)

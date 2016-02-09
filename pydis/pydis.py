@@ -1456,7 +1456,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
         # can use 3 types of interpolations: linear, cubic spline, polynomial
 
         # if invalid mode selected, make it spline
-        if not mode in ('linear', 'spline', 'poly'):
+        if mode not in ('linear', 'spline', 'poly'):
             mode = 'spline'
             print("WARNING: invalid mode set in DefFluxCal. Changing to spline")
 

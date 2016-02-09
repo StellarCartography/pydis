@@ -921,12 +921,12 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         print("Note, this is not very robust. Suggest you re-run with interac=True")
         # find the linelist of choice
 
-        dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+        linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         # if (len(linelist)==0):
-        #     linelist = os.path.join(dir, linelist)
+        #     linelist = os.path.join(linelists_dir, linelist)
 
         # import the linelist
-        linewave = np.loadtxt(os.path.join(dir, linelist), dtype='float',
+        linewave = np.loadtxt(os.path.join(linelists_dir, linelist), dtype='float',
                               skiprows=1,usecols=(0,),unpack=True)
 
 
@@ -1158,9 +1158,9 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
     #-- SECOND PASS
     if second_pass is True:
-        dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+        linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         hireslinelist = 'henear.dat'
-        linewave2 = np.loadtxt(os.path.join(dir, hireslinelist), dtype='float',
+        linewave2 = np.loadtxt(os.path.join(linelists_dir, hireslinelist), dtype='float',
                                skiprows=1, usecols=(0,), unpack=True)
 
         tol2 = tol # / 2.0
@@ -1365,14 +1365,15 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     The flux array
     """
     # read in the airmass extinction curve
-    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources/extinction')
+    extinction_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                'resources/extinction')
     if len(airmass_file)==0:
-        air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
+        air_wave, air_cor = np.loadtxt(os.path.join(extinction_dir, airmass_file),
                                        unpack=True,skiprows=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
         # print('  Note: first 2 rows are skipped, assuming header')
-        air_wave, air_cor = np.loadtxt(os.path.join(dir, airmass_file),
+        air_wave, air_cor = np.loadtxt(os.path.join(extinction_dir, airmass_file),
                                        unpack=True,skiprows=2)
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
@@ -1415,11 +1416,11 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
 
     """
     stdstar2 = stdstar.lower()
-    dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+    std_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                         'resources', 'onedstds')
 
-    if os.path.isfile(os.path.join(dir, stdstar2)):
-        std_wave, std_mag, std_wth = np.loadtxt(os.path.join(dir, stdstar2),
+    if os.path.isfile(os.path.join(std_dir, stdstar2)):
+        std_wave, std_mag, std_wth = np.loadtxt(os.path.join(std_dir, stdstar2),
                                                 skiprows=1, unpack=True)
         # standard star spectrum is stored in magnitude units
         std_flux = _mag2flux(std_wave, std_mag)
@@ -1510,7 +1511,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     else:
         sensfunc2 = np.zeros_like(obj_wave)
         print('ERROR: in DefFluxCal no valid standard star file found at ')
-        print(os.path.join(dir, stdstar2))
+        print(os.path.join(std_dir, stdstar2))
 
     return 10**sensfunc2
 

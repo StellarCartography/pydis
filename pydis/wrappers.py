@@ -22,7 +22,8 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                HeNeAr_tol=20, HeNeAr_order=3, display_HeNeAr=False,
                std_mode='spline', std_order=12, display_std=False,
                trim=True, write_reduced=True,
-               display=True, display_final=True):
+               display=True, display_final=True,
+               silent=True):
     """
     A wrapper routine to carry out the full steps of the spectral
     reduction and calibration. Steps include:
@@ -113,7 +114,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
     """
 
     if (len(biaslist) > 0):
-        bias = pydis.biascombine(biaslist, trim=trim)
+        bias = pydis.biascombine(biaslist, trim=trim, silent=silent)
     else:
         bias = 0.0
 
@@ -145,7 +146,10 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
     for i in range(len(specfile)):
         spec = specfile[i]
-        print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
+        
+        if silent is False:
+            print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
+
         # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
         img = pydis.OpenImg(spec, trim=trim)
         raw = img.data
@@ -555,4 +559,3 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
                            np.percentile(ffinal,98)) )
                 plt.show()
     return
-

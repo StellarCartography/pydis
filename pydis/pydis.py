@@ -182,7 +182,7 @@ class OpenImg(object):
         # return raw, exptime, airmass, wapprox
 
 
-def biascombine(biaslist, output='BIAS.fits', trim=True):
+def biascombine(biaslist, output='BIAS.fits', trim=True, silent=True):
     """
     Combine the bias frames in to a master bias image. Currently only
     supports median combine.
@@ -196,6 +196,8 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
     trim : bool, optional
         Trim the image using the DATASEC keyword in the header, assuming
         has format of [0:1024,0:512] (Default is True)
+    silent : bool, optional
+        If False, print details about the biascombine. (Default is True)
 
     Returns
     -------
@@ -206,6 +208,9 @@ def biascombine(biaslist, output='BIAS.fits', trim=True):
     # assume biaslist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
     files = np.loadtxt(biaslist,dtype='string')
+
+    if silent is False:
+        print('biascombine: combining ' + str(len(files)) + ' files in ' + biaslist)
 
     for i in range(0,len(files)):
         hdu_i = fits.open(files[i])

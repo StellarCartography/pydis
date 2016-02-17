@@ -263,7 +263,7 @@ def overscanbias(img, cols=(1,), rows=(1,)):
 
 
 def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
-                display=True, flat_poly=5, response=True):
+                display=True, flat_poly=5, response=True, Saxis=1):
     """
     Combine the flat frames in to a master flat image. Subtracts the
     master bias image first from each flat image. Currently only
@@ -291,6 +291,9 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
     flat_poly : int, optional
         Polynomial order to fit 1d flat curve with. Only used if
         response is set to True. (Default is 5)
+    Saxis : int, optional
+        Set which axis the spatial dimension is along. 1 = Y axis, 0 = X.
+        (Default is 1)
 
     Returns
     -------
@@ -319,7 +322,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
             im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]] - bias_im
 
         # check for bad regions (not illuminated) in the spatial direction
-        ycomp = im_i.sum(axis=1) # compress to y-axis only
+        ycomp = im_i.sum(axis=Saxis) # compress to spatial axis only
         illum_thresh = 0.8 # value compressed data must reach to be used for flat normalization
         ok = np.where( (ycomp>= np.median(ycomp)*illum_thresh) )
 
@@ -333,11 +336,17 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
     # do median across whole stack of flat images
     flat_stack = np.median(all_data, axis=2)
 
+    # define the wavelength axis
+    Waxis = 0
+    # add a switch in case the spatial/wavelength axis is swapped
+    if Saxis is 0:
+        Waxis = 1
+
     if response is True:
         xdata = np.arange(all_data.shape[1]) # x pixels
 
         # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
-        flat_1d = np.log10(convolve(flat_stack.sum(axis=0), Box1DKernel(5)))
+        flat_1d = np.log10(convolve(flat_stack.sum(axis=Waxis), Box1DKernel(5)))
 
         if mode=='spline':
             spl = UnivariateSpline(xdata, flat_1d, ext=0, k=2 ,s=0.001)
@@ -348,7 +357,6 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
             # get rid of log
             flat_curve = 10.0**np.polyval(flat_fit, xdata)
 
-
         if display is True:
             plt.figure()
             plt.plot(10.0**flat_1d)
@@ -357,13 +365,15 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
 
         # divide median stacked flat by this RESPONSE curve
         flat = np.zeros_like(flat_stack)
-        for i in range(flat_stack.shape[0]):
-            flat[i,:] = flat_stack[i,:] / flat_curve
+
+        if Saxis is 1:
+            for i in range(flat_stack.shape[Waxis]):
+                flat[i,:] = flat_stack[i,:] / flat_curve
+        else:
+            for i in range(flat_stack.shape[Waxis]):
+                flat[:,i] = flat_stack[:,i] / flat_curve
     else:
         flat = flat_stack
-
-    # normalize flat
-    flat = flat #/ np.median(flat[ok,:])
 
     if display is True:
         plt.figure()
@@ -378,7 +388,8 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
 
 
 def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
-             recenter=False, prevtrace=(0,), bigbox=15, display=False):
+             recenter=False, prevtrace=(0,), bigbox=15,
+             Saxis=1, display=False):
     """
     Trace the spectrum aperture in an image
 
@@ -411,6 +422,9 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         The number of sigma away from the main aperture to allow to trace
     display : bool, optional
         If set to true display the trace over-plotted on the image
+    Saxis : int, optional
+        Set which axis the spatial dimension is along. 1 = Y axis, 0 = X.
+        (Default is 1)
 
     Returns
     -------
@@ -419,13 +433,18 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         entire wavelength (X) axis
     """
 
+    # define the wavelength axis
+    Waxis = 0
+    # add a switch in case the spatial/wavelength axis is swapped
+    if Saxis is 0:
+        Waxis = 1
 
     print('Tracing Aperture using nsteps='+str(nsteps))
     # the valid y-range of the chip
     if (len(fmask)>1):
-        ydata = np.arange(img.shape[0])[fmask]
+        ydata = np.arange(img.shape[Waxis])[fmask]
     else:
-        ydata = np.arange(img.shape[0])
+        ydata = np.arange(img.shape[Waxis])
 
     # need at least 4 samples along the trace. sometimes can get away with very few
     if (nsteps<4):
@@ -435,8 +454,8 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     img_sm = scipy.signal.medfilt2d(img, kernel_size=(5,5))
 
     #--- Pick the strongest source, good if only 1 obj on slit
-    ztot = img_sm.sum(axis=1)[ydata]
-    yi = np.arange(img.shape[0])[ydata]
+    ztot = img_sm.sum(axis=Saxis)[ydata]
+    yi = np.arange(img.shape[Waxis])[ydata]
     peak_y = yi[np.nanargmax(ztot)]
     peak_guess = [np.nanmax(ztot), np.median(ztot), peak_y, 2.]
 
@@ -489,14 +508,18 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     ydata2 = ydata[np.where((ydata>=popt_tot[2] - popt_tot[3]*bigbox) &
                             (ydata<=popt_tot[2] + popt_tot[3]*bigbox))]
 
-    yi = np.arange(img.shape[0])[ydata2]
+    yi = np.arange(img.shape[Waxis])[ydata2]
     # define the X-bin edges
-    xbins = np.linspace(0, img.shape[1], nsteps)
+    xbins = np.linspace(0, img.shape[Saxis], nsteps)
     ybins = np.zeros_like(xbins)
 
     for i in range(0,len(xbins)-1):
         #-- fit gaussian w/i each window
-        zi = img_sm[ydata2, xbins[i]:xbins[i+1]].sum(axis=1)
+        if Saxis is 1:
+            zi = img_sm[ydata2, xbins[i]:xbins[i+1]].sum(axis=Saxis)
+        else:
+            zi = img_sm[xbins[i]:xbins[i+1], ydata2].sum(axis=Saxis)
+
         pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
         popt,pcov = curve_fit(_gaus, yi, zi, p0=pguess)
 
@@ -519,7 +542,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     ap_spl = UnivariateSpline(mxbins, mybins, ext=0, k=3, s=0)
 
     # interpolate the spline to 1 position per column
-    mx = np.arange(0,img.shape[1])
+    mx = np.arange(0, img.shape[Saxis])
     my = ap_spl(mx)
 
     if display is True:

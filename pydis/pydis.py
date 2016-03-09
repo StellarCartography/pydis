@@ -25,6 +25,7 @@ from scipy.optimize import curve_fit
 import scipy.signal
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import SmoothBivariateSpline
+from scipy.interpolate import griddata
 import warnings
 
 # import datetime
@@ -800,8 +801,8 @@ def lines_to_surface(img, xcent, ycent, wcent,
     return wfit
 
 
-def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
-               coaddN=1):
+def ap_extract(img, trace, wmap, apwidth=8, skysep=3, skywidth=7,
+               skymode='simple', skydeg=0, coaddN=1., wmode='spline2d'):
     """
     1. Extract the spectrum using the trace. Simply add up all the flux
     around the aperture within a specified +/- width.
@@ -842,56 +843,123 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
 
     Returns
     -------
-    onedspec : 1-d array
+    specflux : 1-d array
         The summed flux at each column about the trace.
     fluxerr : 1-d array
         the uncertainties of the flux values
     """
 
-    onedspec = np.zeros_like(trace)
-    skysubflux = np.zeros_like(trace)
-    fluxerr = np.zeros_like(trace)
+    if skymode is 'complex':
+        #-- first build the sky model through the aperture
+        '''
+        to build sky region: for loop along the trace,
+        save coords of sky regions (x,y), wavelength, and flux
+        '''
 
-    for i in range(0,len(trace)):
-        #-- first do the aperture flux
-        # juuuust in case the trace gets too close to the edge
-        widthup = apwidth
-        widthdn = apwidth
-        if (trace[i]+widthup > img.shape[0]):
-            widthup = img.shape[0]-trace[i] - 1
-        if (trace[i]-widthdn < 0):
-            widthdn = trace[i] - 1
+        skyx = []
+        skyy = []
+        skyw = []
+        skyf = []
+        for i in range(0, len(trace)):
+            itrace = int(trace[i])
+            y = np.append(np.arange(itrace-apwidth-skysep-skywidth, itrace-apwidth-skysep),
+                          np.arange(itrace+apwidth+skysep+1, itrace+apwidth+skysep+skywidth+1))
+            x = np.zeros_like(y) + i
+            z = img[y,i] # the flux in this strip
 
-        # simply add up the total flux around the trace +/- width
-        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup+1, i].sum()
+            w = mapwavelengthxy(x, y, wmap, mode=wmode)
 
-        #-- now do the sky fit
-        itrace = int(trace[i])
-        y = np.append(np.arange(itrace-apwidth-skysep-skywidth, itrace-apwidth-skysep),
-                      np.arange(itrace+apwidth+skysep+1, itrace+apwidth+skysep+skywidth+1))
+            skyx = np.append(skyx, x)
+            skyy = np.append(skyy, y)
+            skyf = np.append(skyf, z)
 
-        z = img[y,i]
-        if (skydeg>0):
-            # fit a polynomial to the sky in this column
-            pfit = np.polyfit(y,z,skydeg)
-            # define the aperture in this column
-            ap = np.arange(trace[i]-apwidth, trace[i]+apwidth+1)
-            # evaluate the polynomial across the aperture, and sum
-            skysubflux[i] = np.sum(np.polyval(pfit, ap))
-        elif (skydeg==0):
-            skysubflux[i] = np.mean(z)*(apwidth*2.0 + 1)
+            skyw = np.append(skyw, w)
 
-        #-- finally, compute the error in this pixel
-        sigB = np.std(z) # stddev in the background data
-        N_B = len(y) # number of bkgd pixels
-        N_A = apwidth*2. + 1 # number of aperture pixels
+        # locations of samples for 2 sky regions
+        points = np.stack((skyx,skyy,skyw), axis=1)
+        values = skyf
 
-        # based on aperture phot err description by F. Masci, Caltech:
-        # http://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
-        fluxerr[i] = np.sqrt(np.sum((onedspec[i]-skysubflux[i])/coaddN) +
-                             (N_A + N_A**2. / N_B) * (sigB**2.))
+        xx,yy = np.meshgrid(img.shape[1], img.shape[0])
+        ww = mapwavelengthxy(xx, yy, wmap, mode=wmode)
 
-    return onedspec, skysubflux, fluxerr
+        '''
+        to get sky values in the aperture: evaluate 2d interpolation
+        over the entire image, given the (x,y,wavelength) coords
+        '''
+        imgsky = griddata(points, values, (xx,yy,ww), method='cubic')
+
+        onedspec = np.zeros_like(trace)
+        fluxerr = np.zeros_like(trace)
+        diff = img - imgsky
+
+        for i in range(0, len(trace)):
+            widthup = apwidth
+            widthdn = apwidth
+            if (trace[i]+widthup > img.shape[0]):
+                widthup = img.shape[0]-trace[i] - 1
+            if (trace[i]-widthdn < 0):
+                widthdn = trace[i] - 1
+
+            # add up the total flux around the trace +/- width
+            onedspec[i] = diff[trace[i]-widthdn:trace[i]+widthup+1, i].sum()
+
+            #-- finally, compute the error in this pixel
+            sigB = np.std(imgsky[trace[i]-widthdn:trace[i]+widthup+1, i]) # stddev in the background data
+            N_B = skywidth*2. # number of bkgd pixels
+            N_A = apwidth*2. + 1 # number of aperture pixels
+
+            # based on aperture phot err description by F. Masci, Caltech:
+            # http://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
+            fluxerr[i] = np.sqrt(np.sum(onedspec[i] / coaddN) +
+                                 (N_A + N_A**2. / N_B) * (sigB**2.))
+
+    if skymode is 'simple':
+        onedspec = np.zeros_like(trace)
+        skysubflux = np.zeros_like(trace)
+        fluxerr = np.zeros_like(trace)
+
+        for i in range(0, len(trace)):
+            #-- first do the aperture flux
+            # juuuust in case the trace gets too close to the edge
+            widthup = apwidth
+            widthdn = apwidth
+            if (trace[i]+widthup > img.shape[0]):
+                widthup = img.shape[0]-trace[i] - 1
+            if (trace[i]-widthdn < 0):
+                widthdn = trace[i] - 1
+
+            # simply add up the total flux around the trace +/- width
+            onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup+1, i].sum()
+
+            #-- now do the sky fit
+            itrace = int(trace[i])
+            y = np.append(np.arange(itrace-apwidth-skysep-skywidth, itrace-apwidth-skysep),
+                          np.arange(itrace+apwidth+skysep+1, itrace+apwidth+skysep+skywidth+1))
+
+            z = img[y,i]
+            if (skydeg>0):
+                # fit a polynomial to the sky in this column
+                pfit = np.polyfit(y,z,skydeg)
+                # define the aperture in this column
+                ap = np.arange(trace[i]-apwidth, trace[i]+apwidth+1)
+                # evaluate the polynomial across the aperture, and sum
+                skysubflux[i] = np.sum(np.polyval(pfit, ap))
+            elif (skydeg==0):
+                skysubflux[i] = np.mean(z)*(apwidth*2.0 + 1)
+
+            #-- finally, compute the error in this pixel
+            sigB = np.std(z) # stddev in the background data
+            N_B = len(y) # number of bkgd pixels
+            N_A = apwidth*2. + 1 # number of aperture pixels
+
+            # based on aperture phot err description by F. Masci, Caltech:
+            # http://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
+            fluxerr[i] = np.sqrt(np.sum((onedspec[i]-skysubflux[i])/coaddN) +
+                                 (N_A + N_A**2. / N_B) * (sigB**2.))
+
+        specflux = onedspec - skysubflux
+
+    return specflux, fluxerr
 
 
 def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
@@ -1371,6 +1439,20 @@ def mapwavelength(trace, wavemap, mode='spline2d'):
     ## using 2d polyfit
     # trace_wave = polyval2d(np.arange(len(trace)), trace, wavemap)
     return trace_wave
+
+
+def mapwavelengthxy(x, y, wavemap, mode='spline2d'):
+
+    if mode=='spline2d':
+        trace_wave = wavemap.ev(x,y)
+
+    elif mode=='poly' or mode=='spline':
+        trace_wave = np.zeros_like(x)
+        for i in range(len(x)):
+            trace_wave[i] = np.interp(y[i], range(wavemap.shape[0]), wavemap[:,x])
+
+    return trace_wave
+
 
 
 def normalize(wave, flux, mode='poly', order=5):

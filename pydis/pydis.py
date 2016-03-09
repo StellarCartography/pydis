@@ -560,14 +560,36 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
 
 def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
     '''
-    Trace the lines
-    :param img:
-    :param pcent:
-    :param wcent:
-    :param fmask:
-    :param maxbend:
-    :param display:
-    :return:
+    Trace the lines of constant wavelength along the spatial dimension.
+
+    To be run after peaks found in the HeNeAr lamp. Usually run internally
+    to HeNeAr_fit()
+
+    Method works by tracing up and down from the image center (slice) along
+    each HeNeAr line by 1 pixel, fitting a gaussian to find the center.
+
+    Parameters
+    ----------
+    img : 2d float
+        the HeNeAr data
+    pcent : float array
+        the pixel center along the image slice of each HeNeAr line to trace
+    wcent : float array
+        the identified wavelength that corresponds to each peak's pixel center (pcent)
+    fmask : float array, optional
+        the illumination section to trace trace over in spatial dimension
+    maxbend : int, optional
+        How big of a width (in pixel units) to allow the bend in the HeNeAr
+        line to search over (Default is 10). Probably doesn't need to be
+        modified much.
+    display : bool, optional
+        should we display plot after? (Default is False)
+
+    Returns
+    -------
+    xcent, ycent, wcent
+    These are the arrays of X pixel (wavelength dimension), Y pixel
+    (spatial dimension), and corresponding wavelengths of each HeNeAr line.
     '''
     xcent_big = []
     ycent_big = []
@@ -701,10 +723,38 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
     return pcent_pix[okcent], wcent_pix[okcent]
 
 
-def lines_to_surface(img, xcent_big, ycent_big, wcent_big, mode='poly', fit_order=2):
+def lines_to_surface(img, xcent, ycent, wcent,
+                     mode='spline2d', fit_order=2):
     '''
-    Turn arc lines into a wavelength solution across the entire chip
+    Turn traced arc lines into a wavelength solution across the entire chip
 
+    Requires inputs from line_trace(). Outputs are a 2d wavelength solution
+
+    Parameters
+    ----------
+
+    img : 2d array
+        the HeNeAr data
+    xcent : 1d array
+        the X (spatial) pixel positions of the HeNeAr lines
+    ycent : 1d array
+        the Y (wavelength) pixel positions of the HeNeAr lines
+    wcent : 1d array
+        the wavelength values of the HeNeAr lines
+    mode : str, optional
+        what mode of interpolation to use to go from traces along the
+        HeNeAr lines to a wavelength value for every (x,y) pixel?
+        Options include
+            poly: along 1-pixel wide slices in the spatial dimension,
+                fit a polynomial between the HeNeAr lines. Uses fit_order
+            spline: along 1-pixel wide slices in the spatial dimension,
+                fit a quadratic spline.
+            spline2d: fit a full 2d surface using a cubic spline. This is
+                the best option, in principle.
+
+    Returns
+    -------
+    the 2d wavelenth solution. Output depends on mode parameter.
     '''
 
     xsz = img.shape[1]
@@ -713,8 +763,8 @@ def lines_to_surface(img, xcent_big, ycent_big, wcent_big, mode='poly', fit_orde
     if (mode=='spline2d'):
         xfitd = 5 # the spline dimension in the wavelength space
         print('Fitting Spline2d - NOTE: this mode doesnt work well')
-        wfit = SmoothBivariateSpline(xcent_big,ycent_big,wcent_big,kx=xfitd,ky=3,
-                                     bbox=[0,img.shape[1],0,img.shape[0]],s=0 )
+        wfit = SmoothBivariateSpline(xcent, ycent, wcent, kx=xfitd, ky=3,
+                                     bbox=[0,img.shape[1],0,img.shape[0]], s=0)
 
     #elif mode=='poly2d':
     ## using 2d polyfit
@@ -724,16 +774,16 @@ def lines_to_surface(img, xcent_big, ycent_big, wcent_big, mode='poly', fit_orde
         wfit = np.zeros_like(img)
         xpix = np.arange(xsz)
 
-        for i in np.arange(ycent_big.min(), ycent_big.max()):
-            x = np.where((ycent_big==i))
+        for i in np.arange(ycent.min(), ycent.max()):
+            x = np.where((ycent == i))
 
-            x_u, ind_u = np.unique(xcent_big[x], return_index=True)
+            x_u, ind_u = np.unique(xcent[x], return_index=True)
 
             # this smoothing parameter is absurd...
-            spl = UnivariateSpline(x_u, wcent_big[x][ind_u], ext=0, k=2, s=5e7)
+            spl = UnivariateSpline(x_u, wcent[x][ind_u], ext=0, k=2, s=5e7)
 
             plt.figure()
-            plt.scatter(xcent_big[x][ind_u], wcent_big[x][ind_u])
+            plt.scatter(xcent[x][ind_u], wcent[x][ind_u])
             plt.plot(xpix, spl(xpix))
             plt.show()
 
@@ -743,9 +793,9 @@ def lines_to_surface(img, xcent_big, ycent_big, wcent_big, mode='poly', fit_orde
         wfit = np.zeros_like(img)
         xpix = np.arange(xsz)
 
-        for i in np.arange(ycent_big.min(), ycent_big.max()):
-            x = np.where((ycent_big==i))
-            coeff = np.polyfit(xcent_big[x], wcent_big[x], fit_order)
+        for i in np.arange(ycent.min(), ycent.max()):
+            x = np.where((ycent == i))
+            coeff = np.polyfit(xcent[x], wcent[x], fit_order)
             wfit[i,:] = np.polyval(coeff, xpix)
     return wfit
 
@@ -1290,7 +1340,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
     return wfit
 
 
-def mapwavelength(trace, wavemap, mode='poly'):
+def mapwavelength(trace, wavemap, mode='spline2d'):
     """
     Compute the wavelength along the center of the trace, to be run after
     the HeNeAr_fit routine.
@@ -1300,8 +1350,13 @@ def mapwavelength(trace, wavemap, mode='poly'):
     trace : 1-d array
         The spatial positions (Y axis) corresponding to the center of the
         trace for every wavelength (X axis), as returned from ap_trace
-    wavemap : bivariate spline object
+    wavemap : bivariate spline object or image-like wavelength map
         The wavelength evaluated at every pixel, output from HeNeAr_fit
+        Type depends on mode parameter.
+    mode : str, optional
+        Which mode was used to generate the 2D wavelength solution in
+        HeNeAr_fit(), and specifically in lines_to_surface()?
+        Options include: poly, spline, spline2d (Default is 'spline2d')
 
     Returns
     -------

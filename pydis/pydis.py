@@ -843,11 +843,7 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
     Returns
     -------
     onedspec : 1-d array
-        The summed flux at each column about the trace. Note: is not
-        sky subtracted!
-    skysubflux : 1-d array
-        The integrated sky values along each column, suitable for
-        subtracting from the output of ap_extract
+        The summed flux at each column about the trace.
     fluxerr : 1-d array
         the uncertainties of the flux values
     """

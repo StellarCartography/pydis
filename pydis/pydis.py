@@ -670,12 +670,12 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
     return xcent_big, ycent_big, wcent_big
 
 
-def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
+def find_peaks(wave, flux, pwidth=10, pthreshold=97, minsep=1):
     '''
     given a slice thru a HeNeAr image, find the significant peaks
 
-    :param wtemp:
-    :param slice:
+    :param wave:
+    :param flux:
     :param pwidth:
         the number of pixels around the "peak" to fit over
     :param pthreshold:
@@ -684,28 +684,28 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
     Peak Pixels, Peak Wavelengths
     '''
     # sort data, cut top x% of flux data as peak threshold
-    flux_thresh = np.percentile(slice, pthreshold)
+    flux_thresh = np.percentile(flux, pthreshold)
 
     # find flux above threshold
-    high = np.where( (slice >= flux_thresh) )
+    high = np.where((flux >= flux_thresh))
 
     # find  individual peaks (separated by > 1 pixel)
-    pk = high[0][ ( (high[0][1:]-high[0][:-1]) > 1 ) ]
+    pk = high[0][1:][ ( (high[0][1:]-high[0][:-1]) > minsep ) ]
 
     # offset from start/end of array by at least same # of pixels
     pk = pk[pk > pwidth]
-    pk = pk[pk < (len(slice)-pwidth)]
+    pk = pk[pk < (len(flux) - pwidth)]
 
-    print('Found '+str(len(pk))+' peaks in HeNeAr to try')
+    # print('Found '+str(len(pk))+' peaks in HeNeAr to fit Gaussians to')
 
     pcent_pix = np.zeros_like(pk,dtype='float')
     wcent_pix = np.zeros_like(pk,dtype='float') # wtemp[pk]
     # for each peak, fit a gaussian to find center
     for i in range(len(pk)):
-        xi = wtemp[pk[i]-pwidth:pk[i]+pwidth*2]
-        yi = slice[pk[i]-pwidth:pk[i]+pwidth*2]
+        xi = wave[pk[i] - pwidth:pk[i] + pwidth]
+        yi = flux[pk[i] - pwidth:pk[i] + pwidth]
 
-        pguess = (np.nanmax(yi), np.median(slice), float(np.nanargmax(yi)), 2.)
+        pguess = (np.nanmax(yi), np.median(flux), float(np.nanargmax(yi)), 2.)
         try:
             popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
                                   p0=pguess)
@@ -719,12 +719,14 @@ def find_peaks(wtemp, slice, pwidth=10, pthreshold=97):
             pcent_pix[i] = float('nan')
             wcent_pix[i] = float('nan')
 
+    wcent_pix, ss = np.unique(wcent_pix, return_index=True)
+    pcent_pix = pcent_pix[ss]
     okcent = np.where((np.isfinite(pcent_pix)))
     return pcent_pix[okcent], wcent_pix[okcent]
 
 
 def lines_to_surface(img, xcent, ycent, wcent,
-                     mode='spline2d', fit_order=2):
+                     mode='spline2d', fit_order=2, display=False):
     '''
     Turn traced arc lines into a wavelength solution across the entire chip
 
@@ -780,12 +782,13 @@ def lines_to_surface(img, xcent, ycent, wcent,
             x_u, ind_u = np.unique(xcent[x], return_index=True)
 
             # this smoothing parameter is absurd...
-            spl = UnivariateSpline(x_u, wcent[x][ind_u], ext=0, k=2, s=5e7)
+            spl = UnivariateSpline(x_u, wcent[x][ind_u], ext=0, k=3, s=5e7)
 
-            plt.figure()
-            plt.scatter(xcent[x][ind_u], wcent[x][ind_u])
-            plt.plot(xpix, spl(xpix))
-            plt.show()
+            if display is True:
+                plt.figure()
+                plt.scatter(xcent[x][ind_u], wcent[x][ind_u])
+                plt.plot(xpix, spl(xpix))
+                plt.show()
 
             wfit[i,:] = spl(xpix)
 

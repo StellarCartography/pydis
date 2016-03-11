@@ -37,6 +37,7 @@ def _MakeTris(linewave0):
     linewave = linewave0.copy()
     linewave.sort()
 
+    # print(linewave)
     ntri = len(linewave)-2
     k0 = 0
     for k in range(ntri):
@@ -85,7 +86,7 @@ def _BuildLineDict(linelist):
 
 
 def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
-               fmask=(0,), display=False):
+               fmask=(0,), display=False, noflatmask=False):
     '''
     (REWORD later)
     Find emission lines, match triangles to dictionary (hash table),
@@ -108,8 +109,8 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
         img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
     # this approach will be very DIS specific
-    disp_approx = hdu[0].header['DISPDW']
-    wcen_approx = hdu[0].header['DISPWC']
+    disp_approx = np.float(hdu[0].header['DISPDW'])
+    wcen_approx = np.float(hdu[0].header['DISPWC'])
 
     # the red chip wavelength is backwards (DIS specific)
     clr = hdu[0].header['DETECTOR']
@@ -119,20 +120,48 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
         sign = 1.0
     hdu.close(closed=True)
 
-    # take a slice thru the data (+/- 10 pixels) in center row of chip
-    slice = img[img.shape[0]/2-50:img.shape[0]/2+50,:].sum(axis=0)
+    if noflatmask is True:
+        ycomp = img.sum(axis=1) # compress to spatial axis only
+        illum_thresh = 0.5 # value compressed data must reach to be used for flat normalization
+        ok = np.where( (ycomp>= np.median(ycomp)*illum_thresh) )
+        fmask = ok[0]
+
+    slice_width = 5.
+    # take a slice thru the data in center row of chip
+    slice = img[img.shape[0]/2.-slice_width:img.shape[0]/2.+slice_width,:].sum(axis=0)
 
     # use the header info to do rough solution (linear guess)
-    wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
+    wtemp = (np.arange(len(slice),dtype='float') - np.float(len(slice))/2.0) * disp_approx * sign + wcen_approx
 
-    pcent_pix, wcent_pix = pydis.find_peaks(wtemp, slice, pwidth=15, pthreshold=90)
+    # if display is True:
+    #     print('disp_approx',disp_approx)
+    #     print('wcen_approx',wcen_approx)
+    #     print(wtemp)
+    #     print(wtemp[0])
+    #     plt.figure()
+    #     plt.plot(wtemp, slice)
+    #     plt.show()
+
+    pcent_pix, wcent_pix = pydis.find_peaks(wtemp, slice, pwidth=10, pthreshold=80, minsep=2)
+
+    # if display is True:
+        # print('>>>>>')
+        # print(pcent_pix)
+        # print(wcent_pix)
+        # print(wcent_pix[1])
+        # print('<<<<<')
+        # plt.figure()
+        # plt.scatter(pcent_pix, wcent_pix, alpha=0.5, s=50)
+        # plt.show()
 
     # build observed triangles from HeNeAr file, in wavelength units
     tri_keys, tri_wave = _MakeTris(wcent_pix)
+    '''print'>', (np.shape(wcent_pix),np.shape(tri_keys), np.shape(tri_wave))'''
 
     # make the same observed tri using pixel units.
     # ** should correspond directly **
     _, tri_pix = _MakeTris(pcent_pix)
+    '''print('>> ',np.shape(pcent_pix), np.shape(tri_pix))'''
 
     # construct the standard object triangles (maybe could be restructured)
     dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
@@ -156,7 +185,7 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
             tri_wave[i,:] = std_wave[indx,:]
         else:
             # need to do something better here too
-            tri_wave[i,:] = np.array([float('nan'), float('nan'), float('nan')])
+            tri_wave[i,:] = np.array([np.nan, np.nan, np.nan])
 
     ok = np.where((np.isfinite(tri_wave)))
 
@@ -167,16 +196,16 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
     out_pix.sort()
 
     xcent_big, ycent_big, wcent_big = pydis.line_trace(img, out_pix, out_wave,
-                                                       fmask=fmask,display=True)
+                                                       fmask=fmask, display=False)
 
     wfit = pydis.lines_to_surface(img, xcent_big, ycent_big, wcent_big,
                             mode='spline')
 
     if display is True:
-        plt.plot()
+        plt.figure()
         plt.scatter(out_pix, out_wave)
-        plt.plot(out_pix,
-                 pydis.mapwavelength(np.ones_like(out_pix)*img.shape[0]/2,
+        plt.plot(np.arange(len(slice)),
+                 pydis.mapwavelength(np.ones_like(slice)*img.shape[0]/2.,
                                      wfit, mode='spline'))
         plt.title('autoHeNeAr Find')
         plt.xlabel('Pixel')
@@ -184,3 +213,8 @@ def autoHeNeAr(calimage, trim=True, maxdist=0.5, linelist='apohenear.dat',
         plt.show()
 
     return wfit
+
+if __name__ == "__main__":
+    import sys
+    print(sys.argv[1])
+    autoHeNeAr(sys.argv[1], display=True, noflatmask=True)

@@ -1,4 +1,5 @@
-# *pyDIS*
+# *PyDIS* [![DOI](https://zenodo.org/badge/9547/jradavenport/pydis.svg)](https://zenodo.org/badge/latestdoi/9547/jradavenport/pydis)
+
 An easy to use reduction package for one dimensional longslit spectroscopy using Python. 
 
 ![](pydis/resources/misc/dis2007.jpg)

@@ -10,7 +10,7 @@ for dirpath, dirnames, files in os.walk('pydis/resources'):
 
 setup(
     name = 'pydis',
-    version = '1.0',
+    version = '1.1',
     description = 'A simple longslit spectroscopy pipeline in Python',
     author = 'James Davenport',
     author_email = 'jradavenport@gmail.com',
@@ -34,9 +34,9 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        #'Programming Language :: Python :: 3', # Py3 hasn't been tested yet
+        #'Programming Language :: Python :: 3.3',
+        #'Programming Language :: Python :: 3.4',
+        #'Programming Language :: Python :: 3.5',
     ],
 )

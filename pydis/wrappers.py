@@ -47,11 +47,11 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
     HeNeAr_file : str
         Path to the HeNeAr calibration image
     stdstar : str
-        Name of the standard star to use for flux calibration. Currently
-        the IRAF library onedstds/spec50cal is used for flux calibration.
-        Assumes the first star in "speclist" is the standard star. If
+        Name of the standard star to use for flux calibration. If
         nothing is entered for "stdstar", no flux calibration will be
-        computed. (Default is '')
+        computed. (Default is '').
+        NOTE1: must include the subdir for the star, e.g. 'spec50cal/feige34'.
+        NOTE2: Assumes the first star in "speclist" is the standard star.
     trace1 : bool, optional
         use trace1=True if only perform aperture trace on first object in
         speclist. Useful if e.g. science targets are faint, and first
@@ -343,16 +343,18 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
                                         skysep=skysep,skywidth=skywidth,
                                         skydeg=skydeg,coaddN=len(specfile))
     xbins = np.arange(data.shape[1])
+
     wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
     ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
-    plt.figure()
-    plt.plot(wfinal, ffinal)
-    plt.title("CO-ADD DONE")
-    plt.ylim( (np.percentile(ffinal,5),
-               np.percentile(ffinal,95)) )
-    plt.show()
+    if display is True:
+        plt.figure()
+        plt.plot(wfinal, ffinal)
+        plt.title("CO-ADD DONE")
+        plt.ylim( (np.percentile(ffinal,5),
+                   np.percentile(ffinal,95)) )
+        plt.show()
 
     return wfinal, ffinal, efinal
 

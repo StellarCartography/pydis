@@ -10,6 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import datetime
+import os
+import glob
+import time
+from astropy.io import fits
+
 
 
 def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
@@ -561,3 +566,54 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
                            np.percentile(ffinal,98)) )
                 plt.show()
     return
+
+
+def realtime(headerkey='IMAGETYP', headerval='object', stdstar='',
+             flatlist='', biaslist='', HeNeAr_file='',
+             trace_recenter=False, ntracesteps=15, trim=True,
+             flat_mode='spline', flat_order=9, flat_response=True,
+             dir='.', exten='fits'
+             ):
+    '''
+    This wrapper does a basic auto-reduction for every object spectrum as it
+    comes in.
+
+    If available, apply the flats and biases.
+    '''
+
+    if (len(biaslist) > 0):
+        bias = pydis.biascombine(biaslist, trim=trim, silent=True)
+    else:
+        bias = 0.0
+
+    if (len(biaslist) > 0) and (len(flatlist) > 0):
+        flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim,
+                                           mode=flat_mode,display=False,
+                                           flat_poly=flat_order, response=flat_response)
+    else:
+        flat = 1.0
+        fmask_out = (1,)
+
+
+
+    # first look over the directory once to see what's in there.
+    files = glob.glob(dir + '/*.' + exten)
+
+    # reduce the files once
+    for i in range(len(files)):
+        # open the image, test if it's an "object"
+        hdu_i = fits.open(files[i])
+        type_i = hdu_i[0].header[headerkey]
+        hdu_i.close(closed=True)
+
+
+    # the big loop to watch the directory
+    print('Watching the current directory. Use Ctrl+c to quit...')
+
+    while True:
+        files_new = glob.glob(dir + '/*.' + exten)
+
+        # if any new files, then reduce them and display
+        # test if new files are  "object" type, of course
+
+        time.sleep(1.) # wait to repeat loop

@@ -27,7 +27,7 @@ wr, fr, er = ReduceCoAdd('robj.lis', 'rflat.lis', 'rbias.lis', # standard input 
                          'data/HeNeAr.0030r.fits', # explicitly point to the arc to use
                          HeNeAr_interac=True, # do interactive arcs
                          HeNeAr_order=5, # arc fit order to use
-                         stdstar='spec50cal/feige34', # what flux standard to use
+                         stdstar='spec50cal/feige34.dat', # what flux standard to use
                          HeNeAr_prev=True, # Use previously found interactive arc line?
                          apwidth=6, # width of spectrum aperture
                          skydeg=0, # polynomial order to use to fit the sky
@@ -39,7 +39,7 @@ wr, fr, er = ReduceCoAdd('robj.lis', 'rflat.lis', 'rbias.lis', # standard input 
 # blue channel reduction
 wb, fb, eb = ReduceCoAdd('bobj.lis', 'bflat.lis', 'bbias.lis',
                          'data/HeNeAr.0030b.fits', HeNeAr_order=2, HeNeAr_interac=True,
-                         stdstar='spec50cal/feige34',
+                         stdstar='spec50cal/feige34.dat',
                          HeNeAr_prev=True,
                          skydeg=0, apwidth=6, skysep=1, skywidth=7, ntracesteps=7,
                          display=False)

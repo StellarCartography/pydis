@@ -20,7 +20,7 @@ from pydis.wrappers import autoreduce
 
 autoreduce('obj.lis', 'flat.lis', 'bias.lis', # the object, flat, and bias lists
            'data/05may31.0035r.fits',  # explicitly point to the arc to use
-           stdstar='spec50cal/bd284211',  # what flux standard to use
+           stdstar='spec50cal/bd284211.dat',  # what flux standard to use
            apwidth=8, # width of spectrum aperture
            skysep=3, # dist in pixels btwn aperture and sky
            skywidth=7, # size of sky area to use

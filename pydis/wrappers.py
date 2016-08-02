@@ -28,6 +28,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                std_mode='spline', std_order=12, display_std=False,
                trim=True, write_reduced=True,
                display=True, display_final=True,
+               HeNeAr_second_pass=True,
                silent=True):
     """
     A wrapper routine to carry out the full steps of the spectral
@@ -142,7 +143,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
         wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
                                 interac=HeNeAr_interac, previous=prev,mode='poly',
                                 display=display_HeNeAr, tol=HeNeAr_tol,
-                                fit_order=HeNeAr_order)
+                                fit_order=HeNeAr_order, second_pass=HeNeAr_second_pass)
 
 
     # read in the list of target spectra

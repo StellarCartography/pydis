@@ -23,6 +23,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                std_mode='spline', std_order=12, display_std=False,
                trim=True, write_reduced=True,
                display=True, display_final=True,
+               HeNeAr_second_pass=True,
                silent=True):
     """
     A wrapper routine to carry out the full steps of the spectral
@@ -135,9 +136,9 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
     # do the HeNeAr mapping first, must apply to all science frames
     if (len(HeNeAr_file) > 0):
         wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
-                                interac=HeNeAr_interac, previous=prev,mode='poly',
+                                interac=HeNeAr_interac, previous=prev, mode='poly',
                                 display=display_HeNeAr, tol=HeNeAr_tol,
-                                fit_order=HeNeAr_order)
+                                fit_order=HeNeAr_order, second_pass=HeNeAr_second_pass)
 
 
     # read in the list of target spectra
@@ -269,12 +270,13 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
 
 def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
-               stdstar='', trace1=False, ntracesteps=15,
-               flat_mode='spline', flat_order=9, flat_response=True,
-               apwidth=6,skysep=1,skywidth=7, skydeg=0,
-               HeNeAr_prev=False, HeNeAr_interac=False,
-               HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
-               trim=True, write_reduced=True, display=True):
+                stdstar='', trace1=False, ntracesteps=15,
+                flat_mode='spline', flat_order=9, flat_response=True,
+                apwidth=6,skysep=1,skywidth=7, skydeg=0,
+                HeNeAr_prev=False, HeNeAr_interac=False,
+                HeNeAr_tol=20, HeNeAr_order=2, displayHeNeAr=False,
+                HeNeAr_second_pass=True,
+                trim=True, write_reduced=True, display=True):
     """
     A special version of autoreduce, that assumes all the target images
     want to be median co-added and then extracted. All images have flat
@@ -294,9 +296,10 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
         prev = ''
     else:
         prev = HeNeAr_file+'.lines'
-    wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out, interac=HeNeAr_interac,
-                      previous=prev,mode='poly',
-                      display=displayHeNeAr, tol=HeNeAr_tol, fit_order=HeNeAr_order)
+    wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
+                            interac=HeNeAr_interac, previous=prev, mode='poly',
+                            display=displayHeNeAr, tol=HeNeAr_tol,
+                            fit_order=HeNeAr_order, second_pass=HeNeAr_second_pass)
 
     #-- the standard star, set the stage
     specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()

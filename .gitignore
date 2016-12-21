@@ -1,0 +1,10 @@
+# distribution / packaging
+
+build/
+dist/
+*.egg-info/
+
+# swap
+
+*.swp
+*.swo

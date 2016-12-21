@@ -160,8 +160,16 @@ class OpenImg(object):
 
         # compute the approximate wavelength solution
         try:
-            self.disp_approx = hdu[0].header['DISPDW']
-            self.wcen_approx = hdu[0].header['DISPWC']
+            # this approach will be very MMT specific
+            disperser = hdu[0].header['DISPERSE'].strip()
+            if disperser == '300GPM':
+                self.disp_approx = 1.96
+            else:
+                raise ValueError("Didn't recognize dispersion element '{0}'".format(
+                    disperser))
+
+            self.wcen_approx = float(hdu[0].header['CENWAVE'])
+
             # the red chip wavelength is backwards (DIS specific)
             clr = hdu[0].header['DETECTOR']
             if (clr.lower()=='red'):
@@ -971,9 +979,15 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         d = map(float, datasec)
         img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
-    # this approach will be very DIS specific
-    disp_approx = hdu[0].header['DISPDW']
-    wcen_approx = hdu[0].header['DISPWC']
+    # this approach will be very MMT specific
+    disperser = hdu[0].header['DISPERSE'].strip()
+    if disperser == '300GPM':
+        disp_approx = 1.96
+    else:
+        raise ValueError("Didn't recognize dispersion element '{0}'".format(
+            disperser))
+
+    wcen_approx = float(hdu[0].header['CENWAVE'])
 
     # the red chip wavelength is backwards (DIS specific)
     clr = hdu[0].header['DETECTOR']
@@ -1189,8 +1203,11 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
 
         if (len(previous)>0):
-            pcent, wcent = np.loadtxt(previous, dtype='float',
-                                      unpack=True, skiprows=1,delimiter=',')
+            try:
+                pcent, wcent = np.loadtxt(previous, dtype='float',
+                                          unpack=True, skiprows=1,delimiter=',')
+            except (IOError, ValueError):
+                raise IOError("Issue reading previous fit file {0} - does it exist and is it non-empty?".format(previous))
 
 
         #---  FIT SMOOTH FUNCTION ---

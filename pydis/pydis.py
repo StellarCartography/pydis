@@ -230,7 +230,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True, silent=True):
         hdu_i.close(closed=True)
 
     # do median across whole stack
-    bias = np.median(all_data, axis=2)
+    bias = np.nanmedian(all_data, axis=2)
 
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(bias)
@@ -246,12 +246,12 @@ def overscanbias(img, cols=(1,), rows=(1,)):
     '''
     bias = np.zeros_like(img)
     if len(cols) > 1:
-        bcol = np.mean(img[:, cols[0]:cols[1]], axis=0)
+        bcol = np.nanmean(img[:, cols[0]:cols[1]], axis=0)
         for j in range(img.shape()[1]):
             img[j,:] = bcol
 
     elif len(rows) > 1:
-        brow = np.mean(img[rows[0]:rows[1], :], axis=1)
+        brow = np.nanmean(img[rows[0]:rows[1], :], axis=1)
         for j in range(img.shape()[0]):
             img[j,:] = brow
 
@@ -324,17 +324,17 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
         # check for bad regions (not illuminated) in the spatial direction
         ycomp = im_i.sum(axis=Saxis) # compress to spatial axis only
         illum_thresh = 0.8 # value compressed data must reach to be used for flat normalization
-        ok = np.where( (ycomp>= np.median(ycomp)*illum_thresh) )
+        ok = np.where( (ycomp>= np.nanmedian(ycomp)*illum_thresh) )
 
         # assume a median scaling for each flat to account for possible different exposure times
         if (i==0):
-            all_data = im_i / np.median(im_i[ok,:])
+            all_data = im_i / np.nanmedian(im_i[ok,:])
         elif (i>0):
-            all_data = np.dstack( (all_data, im_i / np.median(im_i[ok,:])) )
+            all_data = np.dstack( (all_data, im_i / np.nanmedian(im_i[ok,:])) )
         hdu_i.close(closed=True)
 
     # do median across whole stack of flat images
-    flat_stack = np.median(all_data, axis=2)
+    flat_stack = np.nanmedian(all_data, axis=2)
 
     # define the wavelength axis
     Waxis = 0
@@ -457,7 +457,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     ztot = img_sm.sum(axis=Saxis)[ydata]
     yi = np.arange(img.shape[Waxis])[ydata]
     peak_y = yi[np.nanargmax(ztot)]
-    peak_guess = [np.nanmax(ztot), np.median(ztot), peak_y, 2.]
+    peak_guess = [np.nanmax(ztot), np.nanmedian(ztot), peak_y, 2.]
 
     #-- allow interactive mode, if mult obj on slit
     if interac is True and recenter is False:
@@ -500,7 +500,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
 
     #-- use middle of previous trace as starting guess
     if (recenter is True) and (len(prevtrace)>10):
-        peak_guess[2] = np.median(prevtrace)
+        peak_guess[2] = np.nanmedian(prevtrace)
 
     #-- fit a Gaussian to peak
     popt_tot, pcov = curve_fit(_gaus, yi, ztot, p0=peak_guess)
@@ -520,7 +520,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         else:
             zi = img_sm[xbins[i]:xbins[i+1], ydata2].sum(axis=Saxis)
 
-        pguess = [np.nanmax(zi), np.median(zi), yi[np.nanargmax(zi)], 2.]
+        pguess = [np.nanmax(zi), np.nanmedian(zi), yi[np.nanargmax(zi)], 2.]
         popt,pcov = curve_fit(_gaus, yi, zi, p0=pguess)
 
         # if gaussian fits off chip, then use chip-integrated answer
@@ -613,7 +613,7 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
     # plt.scatter(pcent, pcent*0.+np.mean(img))
     # plt.show()
 
-    img_med = np.median(img)
+    img_med = np.nanmedian(img)
     # loop over every HeNeAr peak that had a good fit
 
     for i in range(len(pcent)):
@@ -705,7 +705,7 @@ def find_peaks(wave, flux, pwidth=10, pthreshold=97, minsep=1):
         xi = wave[pk[i] - pwidth:pk[i] + pwidth]
         yi = flux[pk[i] - pwidth:pk[i] + pwidth]
 
-        pguess = (np.nanmax(yi), np.median(flux), float(np.nanargmax(yi)), 2.)
+        pguess = (np.nanmax(yi), np.nanmedian(flux), float(np.nanargmax(yi)), 2.)
         try:
             popt,pcov = curve_fit(_gaus, np.arange(len(xi),dtype='float'), yi,
                                   p0=pguess)
@@ -886,7 +886,7 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
             # evaluate the polynomial across the aperture, and sum
             skysubflux[i] = np.sum(np.polyval(pfit, ap))
         elif (skydeg==0):
-            skysubflux[i] = np.mean(z)*(apwidth*2.0 + 1)
+            skysubflux[i] = np.nanmean(z)*(apwidth*2.0 + 1)
 
         #-- finally, compute the error in this pixel
         sigB = np.std(z) # stddev in the background data
@@ -1133,7 +1133,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                             if (len(nearby[0]) > 4) and (kill is None):
                                 imax = np.nanargmax(slice[nearby])
 
-                                pguess = (np.nanmax(slice[nearby]), np.median(slice), xraw[nearby][imax], 2.)
+                                pguess = (np.nanmax(slice[nearby]), np.nanmedian(slice), xraw[nearby][imax], 2.)
                                 try:
                                     popt,pcov = curve_fit(_gaus, xraw[nearby], slice[nearby], p0=pguess)
                                     self.ax.plot(wtemp[int(popt[2])], popt[0], 'r|')
@@ -1528,7 +1528,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
             # does this bin contain observed spectra, and no Balmer line?
             if (len(rng[0]) > 1) and (len(IsH[0]) == 0):
                 # obj_flux_ds.append(np.sum(obj_flux[rng]) / std_wth[i])
-                obj_flux_ds.append( np.mean(obj_flux[rng]) )
+                obj_flux_ds.append( np.nanmean(obj_flux[rng]) )
                 obj_wave_ds.append(std_wave[i])
                 std_flux_ds.append(std_flux[i])
 

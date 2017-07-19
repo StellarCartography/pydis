@@ -972,15 +972,24 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
     # this approach will be very DIS specific
-    disp_approx = hdu[0].header['DISPDW']
-    wcen_approx = hdu[0].header['DISPWC']
+    try:
+        disp_approx = hdu[0].header['DISPDW']
+        wcen_approx = hdu[0].header['DISPWC']
 
-    # the red chip wavelength is backwards (DIS specific)
-    clr = hdu[0].header['DETECTOR']
-    if (clr.lower()=='red'):
-        sign = -1.0
-    else:
+    except KeyError:
+        disp_approx = 0.
+        wcen_approx = 1.
+
+    try:
+        # the red chip wavelength is backwards (DIS specific)
+        clr = hdu[0].header['DETECTOR']
+        if (clr.lower() == 'red'):
+            sign = -1.0
+        else:
+            sign = 1.0
+    except KeyError:
         sign = 1.0
+
     hdu.close(closed=True)
 
     #-- this is how I *want* to do this. Need to header values later though...

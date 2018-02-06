@@ -144,7 +144,7 @@ class OpenImg(object):
         hdu = fits.open(file)
         if trim is True:
             self.datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-            d = map(float, self.datasec)
+            d = list(map(int, self.datasec))
             self.data = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
         else:
             self.data = hdu[0].data
@@ -207,7 +207,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True, silent=True):
 
     # assume biaslist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
-    files = np.loadtxt(biaslist,dtype='string')
+    files = np.genfromtxt(biaslist,dtype=np.str)
 
     if silent is False:
         print('biascombine: combining ' + str(len(files)) + ' files in ' + biaslist)
@@ -219,7 +219,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True, silent=True):
             im_i = hdu_i[0].data
         if trim is True:
             datasec = hdu_i[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-            d = map(float, datasec)
+            d = list(map(int, datasec))
             im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
         # create image stack
@@ -234,7 +234,7 @@ def biascombine(biaslist, output='BIAS.fits', trim=True, silent=True):
 
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(bias)
-    hduOut.writeto(output, clobber=True)
+    hduOut.writeto(output, overwrite=True)
     return bias
 
 
@@ -310,7 +310,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
 
     # assume flatlist is a simple text file with image names
     # e.g. ls flat.00*b.fits > bflat.lis
-    files = np.loadtxt(flatlist,dtype='string')
+    files = np.genfromtxt(flatlist,dtype=np.str)
 
     for i in range(0,len(files)):
         hdu_i = fits.open(files[i])
@@ -318,7 +318,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
             im_i = hdu_i[0].data - bias_im
         if trim is True:
             datasec = hdu_i[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-            d = map(float, datasec)
+            d = list(map(int, datasec))
             im_i = hdu_i[0].data[d[2]-1:d[3],d[0]-1:d[1]] - bias_im
 
         # check for bad regions (not illuminated) in the spatial direction
@@ -382,7 +382,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
 
     # write output to disk for later use
     hduOut = fits.PrimaryHDU(flat)
-    hduOut.writeto(output, clobber=True)
+    hduOut.writeto(output, overwrite=True)
 
     return flat ,ok[0]
 
@@ -503,7 +503,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         peak_guess[2] = np.nanmedian(prevtrace)
 
     #-- fit a Gaussian to peak
-    popt_tot, pcov = curve_fit(_gaus, yi, ztot, p0=peak_guess)
+    popt_tot, pcov = curve_fit(_gaus, yi[np.isfinite(ztot)], ztot[np.isfinite(ztot)], p0=peak_guess)
     #-- only allow data within a box around this peak
     ydata2 = ydata[np.where((ydata>=popt_tot[2] - popt_tot[3]*bigbox) &
                             (ydata<=popt_tot[2] + popt_tot[3]*bigbox))]
@@ -521,7 +521,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
             zi = img_sm[xbins[i]:xbins[i+1], ydata2].sum(axis=Saxis)
 
         pguess = [np.nanmax(zi), np.nanmedian(zi), yi[np.nanargmax(zi)], 2.]
-        popt,pcov = curve_fit(_gaus, yi, zi, p0=pguess)
+        popt,pcov = curve_fit(_gaus, yi[np.isfinite(ztot)], zi[np.isfinite(ztot)], p0=pguess)
 
         # if gaussian fits off chip, then use chip-integrated answer
         if (popt[2] <= min(ydata)+25) or (popt[2] >= max(ydata)-25):
@@ -790,7 +790,7 @@ def lines_to_surface(img, xcent, ycent, wcent,
                 plt.plot(xpix, spl(xpix))
                 plt.show()
 
-            wfit[i,:] = spl(xpix)
+            wfit[int(i),:] = spl(xpix)
 
     elif mode=='poly':
         wfit = np.zeros_like(img)
@@ -799,7 +799,7 @@ def lines_to_surface(img, xcent, ycent, wcent,
         for i in np.arange(ycent.min(), ycent.max()):
             x = np.where((ycent == i))
             coeff = np.polyfit(xcent[x], wcent[x], fit_order)
-            wfit[i,:] = np.polyval(coeff, xpix)
+            wfit[int(i),:] = np.polyval(coeff, xpix)
     return wfit
 
 
@@ -968,7 +968,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         img = hdu[0].data
     if trim is True:
         datasec = hdu[0].header['DATASEC'][1:-1].replace(':',',').split(',')
-        d = map(float, datasec)
+        d = list(map(int, datasec))
         img = hdu[0].data[d[2]-1:d[3],d[0]-1:d[1]]
 
     # this approach will be very DIS specific
@@ -997,7 +997,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
 
     # take a slice thru the data (+/- 10 pixels) in center row of chip
-    slice = img[img.shape[0]/2-10:img.shape[0]/2+10,:].sum(axis=0)
+    slice = img[int(img.shape[0]/2-10):int(img.shape[0]/2+10),:].sum(axis=0)
 
     # use the header info to do rough solution (linear guess)
     wtemp = (np.arange(len(slice))-len(slice)/2) * disp_approx * sign + wcen_approx
@@ -1016,7 +1016,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         #     linelist = os.path.join(linelists_dir, linelist)
 
         # import the linelist
-        linewave = np.loadtxt(os.path.join(linelists_dir, linelist), dtype='float',
+        linewave = np.genfromtxt(os.path.join(linelists_dir, linelist), dtype='float',
                               skiprows=1,usecols=(0,),unpack=True)
 
 
@@ -1129,7 +1129,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                             if len(self.pcent)>0:
                                 for k in range(len(self.pcent)):
                                     if np.abs(self.ixlib[k]-ix)<tol:
-                                        kill_d = raw_input('> WARNING: Click too close to existing point. To delete existing point, enter "d"')
+                                        kill_d = input('> WARNING: Click too close to existing point. To delete existing point, enter "d"')
                                         if kill_d=='d':
                                             kill = k
                                 if kill is not None:
@@ -1155,7 +1155,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
                                 # using raw_input sucks b/c doesn't raise terminal, but works for now
                                 try:
-                                    number=float(raw_input('> Enter Wavelength: '))
+                                    number=float(input('> Enter Wavelength: '))
                                     self.pcent.append(popt[2])
                                     self.wcent.append(number)
                                     self.ixlib.append((ix))
@@ -1198,7 +1198,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
 
         if (len(previous)>0):
-            pcent, wcent = np.loadtxt(previous, dtype='float',
+            pcent, wcent = np.genfromtxt(previous, dtype='float',
                                       unpack=True, skiprows=1,delimiter=',')
 
 
@@ -1240,7 +1240,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
             _CheckMono(wtemp)
 
             print(' ')
-            done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
+            done = str(input('ENTER: "d" (done) or a # (poly order): '))
 
 
     # = = = = = = = = = = = = = = = = = =
@@ -1250,7 +1250,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
     if second_pass is True:
         linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         hireslinelist = 'henear.dat'
-        linewave2 = np.loadtxt(os.path.join(linelists_dir, hireslinelist), dtype='float',
+        linewave2 = np.genfromtxt(os.path.join(linelists_dir, hireslinelist), dtype='float',
                                skiprows=1, usecols=(0,), unpack=True)
 
         tol2 = tol # / 2.0
@@ -1339,7 +1339,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
                 _CheckMono(wtemp)
 
                 print(' ')
-                done = str(raw_input('ENTER: "d" (done) or a # (poly order): '))
+                done = str(input('ENTER: "d" (done) or a # (poly order): '))
 
     #-- trace the peaks vertically --
     xcent_big, ycent_big, wcent_big = line_trace(img, pcent, wcent,
@@ -1463,12 +1463,12 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
     extinction_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                 'resources/extinction')
     if len(airmass_file)==0:
-        air_wave, air_cor = np.loadtxt(os.path.join(extinction_dir, airmass_file),
+        air_wave, air_cor = np.genfromtxt(os.path.join(extinction_dir, airmass_file),
                                        unpack=True,skiprows=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
         # print('  Note: first 2 rows are skipped, assuming header')
-        air_wave, air_cor = np.loadtxt(os.path.join(extinction_dir, airmass_file),
+        air_wave, air_cor = np.genfromtxt(os.path.join(extinction_dir, airmass_file),
                                        unpack=True,skiprows=2)
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
@@ -1515,7 +1515,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
                         'resources', 'onedstds')
 
     if os.path.isfile(os.path.join(std_dir, stdstar2)):
-        std_wave, std_mag, std_wth = np.loadtxt(os.path.join(std_dir, stdstar2),
+        std_wave, std_mag, std_wth = np.genfromtxt(os.path.join(std_dir, stdstar2),
                                                 skiprows=1, unpack=True)
         # standard star spectrum is stored in magnitude units
         std_flux = _mag2flux(std_wave, std_mag)

@@ -1528,11 +1528,10 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
         obj_wave_ds = []
         std_flux_ds = []
         for i in range(len(std_wave)):
-            rng = np.where((obj_wave>=std_wave[i]) &
-                           (obj_wave<std_wave[i]+std_wth[i]) )
-
-            IsH = np.where((balmer>=std_wave[i]) &
-                           (balmer<std_wave[i]+std_wth[i]) )
+            rng = np.where((obj_wave >= std_wave[i] - std_wth[i] / 2.0) &
+                           (obj_wave < std_wave[i] + std_wth[i] / 2.0))
+            IsH = np.where((balmer >= std_wave[i] - std_wth[i] / 2.0) &
+                           (balmer < std_wave[i] + std_wth[i] / 2.0))
 
             # does this bin contain observed spectra, and no Balmer line?
             if (len(rng[0]) > 1) and (len(IsH[0]) == 0):

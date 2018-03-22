@@ -11,6 +11,22 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import datetime
 
+def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
+    # write file with the trace (y positions)
+    tout = open(spec+'.trace','w')
+    tout.write('#  This file contains the x,y coordinates of the trace \n')
+    for k in range(len(trace)):
+        tout.write(str(k)+', '+str(trace[k]) + '\n')
+    tout.close()
+
+    # write the final spectrum out
+    fout = open(spec+'.spec','w')
+    fout.write('#  This file contains the final extracted (wavelength,flux,err) data \n')
+    for k in range(len(wfinal)):
+        fout.write(str(wfinal[k]) + '  ' + str(ffinal[k]) + '  ' + str(efinal[k]) + '\n')
+    fout.close()
+    return
+
 
 def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
                stdstar='', trace_recenter=False, trace_interac=True,
@@ -143,7 +159,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
     # read in the list of target spectra
     # assumes specfile is a list of file names of object
-    specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()
+    specfile = np.array([np.genfromtxt(speclist, dtype=np.str)]).flatten()
 
     for i in range(len(specfile)):
         spec = specfile[i]
@@ -230,7 +246,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
 
         if write_reduced is True:
-            pydis._WriteSpec(spec, wfinal, ffinal, efinal, trace)
+            _WriteSpec(spec, wfinal, ffinal, efinal, trace)
 
             now = datetime.datetime.now()
 
@@ -262,8 +278,8 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
             plt.ylabel('Flux')
             plt.title(spec)
             #plot within percentile limits
-            plt.ylim( (np.percentile(ffinal,2),
-                       np.percentile(ffinal,98)) )
+            plt.ylim( (np.nanpercentile(ffinal,2),
+                       np.nanpercentile(ffinal,98)) )
             plt.show()
 
     return
@@ -302,7 +318,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
                             fit_order=HeNeAr_order, second_pass=HeNeAr_second_pass)
 
     #-- the standard star, set the stage
-    specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()
+    specfile = np.array([np.genfromtxt(speclist, dtype=np.str)]).flatten()
     spec = specfile[0]
     # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
     img = pydis.OpenImg(spec, trim=trim)
@@ -355,8 +371,8 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
         plt.figure()
         plt.plot(wfinal, ffinal)
         plt.title("CO-ADD DONE")
-        plt.ylim( (np.percentile(ffinal,5),
-                   np.percentile(ffinal,95)) )
+        plt.ylim( (np.nanpercentile(ffinal,5),
+                   np.nanpercentile(ffinal,95)) )
         plt.show()
 
     return wfinal, ffinal, efinal
@@ -365,7 +381,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
 def CoAddFinal(frames, mode='mean', display=True):
     # co-add FINSIHED, reduced spectra
     # only trick: resample on to wavelength grid of 1st frame
-    files = np.loadtxt(frames, dtype='string',unpack=True)
+    files = np.genfromtxt(frames, dtype=np.str,unpack=True)
 
     # read in first file
     wave_0, flux_0 = np.loadtxt(files[0],dtype='float',skiprows=1,
@@ -435,7 +451,7 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
     # read in the list of target spectra
     # assumes specfile is a list of file names of object
     #-> wrap with array and flatten because Numpy sucks with one-element arrays...
-    specfile = np.array([np.loadtxt(speclist, dtype='string')]).flatten()
+    specfile = np.array([np.genfromtxt(speclist, dtype=np.str)]).flatten()
 
     for i in range(len(specfile)):
         spec = specfile[i]
@@ -529,7 +545,7 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
                                                sens_wave, sens_flux)
 
             if write_reduced is True:
-                pydis._WriteSpec(spec+tnum, wfinal, ffinal, efinal, trace)
+                _WriteSpec(spec+tnum, wfinal, ffinal, efinal, trace)
 
                 now = datetime.datetime.now()
 
@@ -560,7 +576,7 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
                 plt.ylabel('Flux')
                 plt.title(spec)
                 #plot within percentile limits
-                plt.ylim( (np.percentile(ffinal,2),
-                           np.percentile(ffinal,98)) )
+                plt.ylim( (np.nanpercentile(ffinal,2),
+                           np.nanpercentile(ffinal,98)) )
                 plt.show()
     return

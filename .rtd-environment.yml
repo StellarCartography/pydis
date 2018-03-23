@@ -1,0 +1,13 @@
+name: pydis
+
+channels:
+    - astropy
+
+dependencies:
+    - astropy
+    - scipy
+    - matplotlib
+    - numpy
+    - pip:
+        - sphinx-automodapi
+        - numpydoc

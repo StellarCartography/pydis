@@ -1,9 +1,14 @@
-from .pydis import (OpenImg, ap_trace, ap_extract, HeNeAr_fit,
-                    mapwavelength, biascombine, flatcombine,
-                    line_trace, find_peaks, lines_to_surface,
-                    normalize, DefFluxCal, ApplyFluxCal, AirmassCor)
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
 
+# Packages may add whatever they like to this file, but
+# should keep this content at the top.
+# ----------------------------------------------------------------------------
+from ._astropy_init import *
+# ----------------------------------------------------------------------------
 
-from .wrappers import (autoreduce, CoAddFinal, ReduceCoAdd, ReduceTwo)
+if not _ASTROPY_SETUP_:
+    # For egg_info test builds to pass, put package imports here.
 
-from .linehash import (autoHeNeAr)
+    from .pydis import *
+    from .wrappers import *
+    from .linehash import *

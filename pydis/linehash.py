@@ -11,8 +11,9 @@ import pydis
 from astropy.io import fits
 import numpy as np
 import os
-from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+
+__all__ = ['autoHeNeAr']
 
 
 def _MakeTris(linewave0):

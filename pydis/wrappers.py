@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import datetime
 
+__all__ = ['autoreduce', 'CoAddFinal', 'ReduceCoAdd', 'ReduceTwo']
+
+
 def _WriteSpec(spec, wfinal, ffinal, efinal, trace):
     # write file with the trace (y positions)
     tout = open(spec+'.trace','w')

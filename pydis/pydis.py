@@ -30,6 +30,10 @@ import warnings
 # import datetime
 # from matplotlib.widgets import SpanSelector
 
+__all__ = ['OpenImg', 'ap_trace', 'ap_extract', 'HeNeAr_fit', 'mapwavelength',
+           'biascombine', 'flatcombine', 'line_trace', 'find_peaks',
+           'lines_to_surface', 'normalize', 'DefFluxCal', 'ApplyFluxCal',
+           'AirmassCor']
 
 
 def _mag2flux(wave, mag, zeropt=48.60):

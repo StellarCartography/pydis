@@ -1,0 +1,7 @@
+numpy >= 1.6
+matplotlib
+astropy >= 1.3
+sphinx-automodapi
+scipy
+h5py
+batman-package

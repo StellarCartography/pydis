@@ -11,6 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import datetime
 
+from .pydis import (DefFluxCal, HeNeAr_fit, flatcombine, biascombine, OpenImg,
+                    ap_trace, ap_extract, mapwavelength, AirmassCor,
+                    ApplyFluxCal)
+
 __all__ = ['autoreduce', 'CoAddFinal', 'ReduceCoAdd', 'ReduceTwo']
 
 
@@ -134,12 +138,12 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
     """
 
     if (len(biaslist) > 0):
-        bias = pydis.biascombine(biaslist, trim=trim, silent=silent)
+        bias = biascombine(biaslist, trim=trim, silent=silent)
     else:
         bias = 0.0
 
     if (len(biaslist) > 0) and (len(flatlist) > 0):
-        flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim,
+        flat,fmask_out = flatcombine(flatlist, bias, trim=trim,
                                            mode=flat_mode,display=False,
                                            flat_poly=flat_order, response=flat_response)
     else:
@@ -154,7 +158,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
     # do the HeNeAr mapping first, must apply to all science frames
     if (len(HeNeAr_file) > 0):
-        wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
+        wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
                                 interac=HeNeAr_interac, previous=prev, mode='poly',
                                 display=display_HeNeAr, tol=HeNeAr_tol,
                                 fit_order=HeNeAr_order, second_pass=HeNeAr_second_pass)
@@ -171,7 +175,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
             print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
 
         # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
-        img = pydis.OpenImg(spec, trim=trim)
+        img = OpenImg(spec, trim=trim)
         raw = img.data
         exptime = img.exptime
         airmass = img.airmass
@@ -189,11 +193,11 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
         # with reduced data, trace the aperture
         if (i==0) or (trace1 is False):
-            trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+            trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
                              recenter=trace_recenter, interac=trace_interac)
 
         # extract the spectrum, measure sky values along trace, get flux errors
-        ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
+        ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
                                             skysep=skysep,skywidth=skywidth,
                                             skydeg=skydeg,coaddN=1)
 
@@ -214,7 +218,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
 
         if (len(HeNeAr_file) > 0):
-            wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+            wfinal = mapwavelength(trace, wfit, mode='poly')
         else:
             # if no line lamp given, use approx from the img header
             wfinal = wapprox
@@ -228,13 +232,13 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
         flux_red = (ext_spec - sky)
 
         # now correct the spectrum for airmass extinction
-        flux_red_x = pydis.AirmassCor(wfinal, flux_red, airmass,
+        flux_red_x = AirmassCor(wfinal, flux_red, airmass,
                                 airmass_file=airmass_file)
 
         # now get flux std IF stdstar is defined
         # !! assume first object in list is std star !!
         if (len(stdstar) > 0) and (i==0):
-            sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+            sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
                                    mode=std_mode, polydeg=std_order, display=display_std)
             sens_wave = wfinal
 
@@ -244,7 +248,7 @@ def autoreduce(speclist, flatlist='', biaslist='', HeNeAr_file='',
             sens_wave = wfinal
 
         # final step in reduction, apply sensfunc
-        ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr,
+        ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr,
                                            sens_wave, sens_flux)
 
 
@@ -308,14 +312,14 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
 
     """
     #-- the basic crap, used for all frames
-    bias = pydis.biascombine(biaslist, trim=trim)
-    flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
+    bias = biascombine(biaslist, trim=trim)
+    flat,fmask_out = flatcombine(flatlist, bias, trim=trim, mode=flat_mode,display=False,
                                  flat_poly=flat_order, response=flat_response)
     if HeNeAr_prev is False:
         prev = ''
     else:
         prev = HeNeAr_file+'.lines'
-    wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
+    wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
                             interac=HeNeAr_interac, previous=prev, mode='poly',
                             display=displayHeNeAr, tol=HeNeAr_tol,
                             fit_order=HeNeAr_order, second_pass=HeNeAr_second_pass)
@@ -324,7 +328,7 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
     specfile = np.array([np.genfromtxt(speclist, dtype=np.str)]).flatten()
     spec = specfile[0]
     # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
-    img = pydis.OpenImg(spec, trim=trim)
+    img = OpenImg(spec, trim=trim)
     raw = img.data
     exptime = img.exptime
     airmass = img.airmass
@@ -332,24 +336,24 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
 
     data = ((raw - bias) / flat) / exptime
 
-    trace = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
+    trace = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps)
     # extract the spectrum, measure sky values along trace, get flux errors
-    ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
+    ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
                                         skysep=skysep,skywidth=skywidth,
                                         skydeg=skydeg,coaddN=1)
     xbins = np.arange(data.shape[1])
-    wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+    wfinal = mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
-    sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+    sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
                            mode='spline',polydeg=12)
     sens_wave = wfinal
-    ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
+    ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
     #-- the target star exposures, stack and proceed
     for i in range(1,len(specfile)):
         spec = specfile[i]
         # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
-        img = pydis.OpenImg(spec, trim=trim)
+        img = OpenImg(spec, trim=trim)
         raw = img.data
         exptime = img.exptime
         airmass = img.airmass
@@ -361,14 +365,14 @@ def ReduceCoAdd(speclist, flatlist, biaslist, HeNeAr_file,
             all_data = np.dstack( (all_data, data_i))
     data = np.median(all_data, axis=2)
     # extract the spectrum, measure sky values along trace, get flux errors
-    ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
+    ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
                                         skysep=skysep,skywidth=skywidth,
                                         skydeg=skydeg,coaddN=len(specfile))
     xbins = np.arange(data.shape[1])
 
-    wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+    wfinal = mapwavelength(trace, wfit, mode='poly')
     flux_red_x = (ext_spec - sky)
-    ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
+    ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr, sens_wave, sens_flux)
 
     if display is True:
         plt.figure()
@@ -427,12 +431,12 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
 
     if (len(biaslist) > 0):
-        bias = pydis.biascombine(biaslist, trim=trim)
+        bias = biascombine(biaslist, trim=trim)
     else:
         bias = 0.0
 
     if (len(biaslist) > 0) and (len(flatlist) > 0):
-        flat,fmask_out = pydis.flatcombine(flatlist, bias, trim=trim,
+        flat,fmask_out = flatcombine(flatlist, bias, trim=trim,
                                            mode=flat_mode,display=False,
                                            flat_poly=flat_order, response=flat_response)
     else:
@@ -446,7 +450,7 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
 
     # do the HeNeAr mapping first, must apply to all science frames
     if (len(HeNeAr_file) > 0):
-        wfit = pydis.HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
+        wfit = HeNeAr_fit(HeNeAr_file, trim=trim, fmask=fmask_out,
                                 interac=HeNeAr_interac, previous=prev,mode='poly',
                                 display=display_HeNeAr, tol=HeNeAr_tol,
                                 fit_order=HeNeAr_order)
@@ -460,7 +464,7 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
         spec = specfile[i]
         print("> Processing file "+spec+" ["+str(i)+"/"+str(len(specfile))+"]")
         # raw, exptime, airmass, wapprox = pydis.OpenImg(spec, trim=trim)
-        img = pydis.OpenImg(spec, trim=trim)
+        img = OpenImg(spec, trim=trim)
         raw = img.data
         exptime = img.exptime
         airmass = img.airmass
@@ -476,9 +480,9 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
             plt.show()
 
         # with reduced data, trace BOTH apertures
-        trace_1 = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+        trace_1 = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
                                  recenter=trace_recenter, interac=True)
-        trace_2 = pydis.ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
+        trace_2 = ap_trace(data,fmask=fmask_out, nsteps=ntracesteps,
                                  recenter=trace_recenter, interac=True)
 
 
@@ -513,12 +517,12 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
             t_indx = t_indx + 1
 
             # extract the spectrum, measure sky values along trace, get flux errors
-            ext_spec, sky, fluxerr = pydis.ap_extract(data, trace, apwidth=apwidth,
+            ext_spec, sky, fluxerr = ap_extract(data, trace, apwidth=apwidth,
                                             skysep=skysep,skywidth=skywidth,
                                             skydeg=skydeg,coaddN=1)
 
             if (len(HeNeAr_file) > 0):
-                wfinal = pydis.mapwavelength(trace, wfit, mode='poly')
+                wfinal = mapwavelength(trace, wfit, mode='poly')
             else:
                 # if no line lamp given, use approx from the img header
                 wfinal = wapprox
@@ -528,13 +532,13 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
             flux_red = (ext_spec - sky)
 
             # now correct the spectrum for airmass extinction
-            flux_red_x = pydis.AirmassCor(wfinal, flux_red, airmass,
+            flux_red_x = AirmassCor(wfinal, flux_red, airmass,
                                     airmass_file=airmass_file)
 
             # now get flux std IF stdstar is defined
             # !! assume first object in list is std star !!
             if (len(stdstar) > 0) and (i==0):
-                sens_flux = pydis.DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
+                sens_flux = DefFluxCal(wfinal, flux_red_x, stdstar=stdstar,
                                        mode=std_mode, polydeg=std_order, display=display_std)
                 sens_wave = wfinal
 
@@ -544,7 +548,7 @@ def ReduceTwo(speclist, flatlist='', biaslist='', HeNeAr_file='',
                 sens_wave = wfinal
 
             # final step in reduction, apply sensfunc
-            ffinal,efinal = pydis.ApplyFluxCal(wfinal, flux_red_x, fluxerr,
+            ffinal,efinal = ApplyFluxCal(wfinal, flux_red_x, fluxerr,
                                                sens_wave, sens_flux)
 
             if write_reduced is True:

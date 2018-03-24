@@ -246,7 +246,9 @@ def overscanbias(img, cols=(1,), rows=(1,)):
     '''
     Generate a bias frame based on overscan region.
     Can work with rows or columns, pass either kwarg the limits:
-    >>> bias = overscanbias(imagedata, cols=(1024,1050))
+
+    >>> bias = overscanbias(imagedata, cols=(1024,1050))  # doctest: +SKIP
+
     '''
     bias = np.zeros_like(img)
     if len(cols) > 1:
@@ -407,8 +409,10 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     img : 2d numpy array
         This is the image, stored as a normal numpy array. Can be read in
         using astropy.io.fits like so:
-        >>> hdu = fits.open('file.fits')
-        >>> img = hdu[0].data
+
+        >>> hdu = fits.open('file.fits')  # doctest: +SKIP
+        >>> img = hdu[0].data  # doctest: +SKIP
+
     nsteps : int, optional
         Keyword, number of bins in X direction to chop image into. Use
         fewer bins if ap_trace is having difficulty, such as with faint
@@ -828,8 +832,10 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
     img : 2d numpy array
         This is the image, stored as a normal numpy array. Can be read in
         using astropy.io.fits like so:
-        >>> hdu = fits.open('file.fits')
-        >>> img = hdu[0].data
+
+        >>> hdu = fits.open('file.fits') # doctest: +SKIP
+        >>> img = hdu[0].data # doctest: +SKIP
+
     trace : 1-d array
         The spatial positions (Y axis) corresponding to the center of the
         trace for every wavelength (X axis), as returned from ap_trace
@@ -1398,8 +1404,8 @@ def normalize(wave, flux, mode='poly', order=5):
     Return a flattened, normalized spectrum. A model spectrum is made of
     the continuum by fitting either a polynomial or spline to the data,
     and then the data is normalized with the equation:
-    >>> norm = (flux - model) / model
 
+    >>> norm = (flux - model) / model  # doctest: +SKIP
 
     Parameters
     ----------
@@ -1489,21 +1495,27 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
     ----------
     obj_wave : 1-d array
         The 1-d wavelength array of the spectrum
+
     obj_flux : 1-d array
         The 1-d flux array of the spectrum
+
     stdstar : str
         Name of the standard star file to use for flux calibration. You
         must give the subdirectory and file name, for example:
-        >>> sensfunc = DefFluxCal(wave, flux, mode='spline',
-        >>>                       stdstar='spec50cal/feige34.dat')
+
+        >>> sensfunc = DefFluxCal(wave, flux, mode='spline', stdstar='spec50cal/feige34.dat')  # doctest: +SKIP
+
         If no standard is set, or an invalid standard is selected, will
         return array of 1's and a warning. A list of all available
         subdirectories and objects is available on the wiki, or look in
         pydis/resources/onedstds/
+
     mode : str, optional
         either "linear", "spline", or "poly" (Default is spline)
+
     polydeg : float, optional
         set the order of the polynomial to fit through (Default is 9)
+
     display : bool, optional
         If True, plot the down-sampled sensfunc and fit to screen (Default
         is False)

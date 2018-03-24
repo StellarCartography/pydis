@@ -23,18 +23,19 @@ DCT. **If you use PyDIS, please send me feedback!**
 Some background motivation on why I made this package is
 `given here <http://jradavenport.github.io/2015/04/01/spectra.html>`_
 
+Contents
+========
 
-Examples
---------
+.. toctree::
+   :maxdepth: 2
 
-See the `examples page <https://github.com/jradavenport/pydis/wiki/Examples>` on
-the Wiki for a few worked examples of reducing DIS data, or the step-by-step
-`manual reduction guide <https://github.com/jradavenport/pydis/wiki/Manual-Reduction-Guide>`_
-for a detailed tutorial on reducing 1-d spectroscopy data with *pyDIS*.
-
+   installation
+   stepbystep
+   autoreduce
+   api
 
 Motivation
-----------
+++++++++++
 
 Really slick tools exist for on-the-fly photometry analysis. However,
 no turn-key, easy to use spectra toolkit for Python (without IRAF or PyRAF)
@@ -58,16 +59,10 @@ So far *pyDIS* can do a rough job of all the reduction tasks for single point so
 We are seeking more data to test it against, to help refine the solution and find bugs.
 
 How to Help
------------
++++++++++++
 
 - Check out the Issues page if you think you can help code, or want to requst a feature!
 - If you have some data already reduced in IRAF that you trust and would be willing to share, let us know!
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Contents:
-
-   api
 
 
 Indices and tables

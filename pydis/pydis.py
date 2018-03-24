@@ -13,7 +13,10 @@ e.g. DIS specifics:
 """
 
 import matplotlib
-matplotlib.use('TkAgg')
+# try:
+#     matplotlib.use('TkAgg')
+# finally:
+#     pass
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.widgets import Cursor

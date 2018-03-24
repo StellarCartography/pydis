@@ -12,3 +12,4 @@ dependencies:
     - pip:
         - sphinx-automodapi
         - numpydoc
+        - sphinx-astropy

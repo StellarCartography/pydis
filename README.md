@@ -1,6 +1,7 @@
 # *PyDIS* [![DOI](https://zenodo.org/badge/9547/jradavenport/pydis.svg)](https://zenodo.org/badge/latestdoi/9547/jradavenport/pydis)
 
-[![Build Status](https://travis-ci.org/TheAstroFactory/pydis.svg?branch=master)](https://travis-ci.org/TheAstroFactory/pydis)
+[![Build Status](https://travis-ci.org/TheAstroFactory/pydis.svg?branch=master)](https://travis-ci.org/TheAstroFactory/pydis) [![Documentation Status](https://readthedocs.org/projects/pydis/badge/?version=master)](http://pydis.readthedocs.io/?badge=master)
+
 
 An easy to use reduction package for one dimensional longslit spectroscopy using Python. 
 

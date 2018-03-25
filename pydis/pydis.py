@@ -680,13 +680,21 @@ def line_trace(img, pcent, wcent, fmask=(1,), maxbend=10, display=False):
 
 def find_peaks(wave, flux, pwidth=10, pthreshold=97, minsep=1):
     '''
-    given a slice thru a HeNeAr image, find the significant peaks
+    Given a slice thru a HeNeAr image, find the significant peaks.
 
-    :param wave:
-    :param flux:
-    :param pwidth:
+    Parameters
+    ----------
+    wave : `~numpy.ndarray`
+        Wavelength
+    flux : `~numpy.ndarray`
+        Flux
+    pwidth : float
         the number of pixels around the "peak" to fit over
-    :param pthreshold:
+    pthreshold : float
+        Peak threshold
+    minsep : float
+        Minimum separation
+
     Returns
     -------
     Peak Pixels, Peak Wavelengths
@@ -751,16 +759,14 @@ def lines_to_surface(img, xcent, ycent, wcent,
         the Y (wavelength) pixel positions of the HeNeAr lines
     wcent : 1d array
         the wavelength values of the HeNeAr lines
-    mode : str, optional
+    mode : str, {'poly', 'spline', 'spline2d'}
         what mode of interpolation to use to go from traces along the
         HeNeAr lines to a wavelength value for every (x,y) pixel?
-        Options include
-            poly: along 1-pixel wide slices in the spatial dimension,
-                fit a polynomial between the HeNeAr lines. Uses fit_order
-            spline: along 1-pixel wide slices in the spatial dimension,
-                fit a quadratic spline.
-            spline2d: fit a full 2d surface using a cubic spline. This is
-                the best option, in principle.
+        Options include (1) poly: along 1-pixel wide slices in the spatial
+        dimension, fit a polynomial between the HeNeAr lines. Uses fit_order;
+        (2) spline: along 1-pixel wide slices in the spatial dimension,
+        fit a quadratic spline; (3) spline2d: fit a full 2d surface using a
+        cubic spline. This is the best option, in principle.
 
     Returns
     -------
@@ -1456,14 +1462,10 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
         The 1-d or 2-d flux array of the spectrum
     airmass : float
         The value of the airmass, not the header keyword.
-    airmass_file : str, optional
+    airmass_file : str, {'apoextinct.dat', 'ctioextinct.dat', 'kpnoextinct.dat', 'ormextinct.dat'}
         The name of the airmass extinction file. This routine assumes
         the file is stored in the resources/extinction/ subdirectory.
-        Available files are (Default is apoextinct.dat):
-            apoextinct.dat
-            ctioextinct.dat
-            kpnoextinct.dat
-            ormextinct.dat
+        Available files are (Default is apoextinct.dat)
 
     Returns
     -------

@@ -517,8 +517,9 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
                             (ydata<=popt_tot[2] + popt_tot[3]*bigbox))]
 
     yi = np.arange(img.shape[Waxis])[ydata2]
+
     # define the X-bin edges
-    xbins = np.linspace(0, img.shape[Saxis], nsteps)
+    xbins = np.linspace(0, img.shape[Saxis], nsteps).astype('int')
     ybins = np.zeros_like(xbins)
 
     for i in range(0,len(xbins)-1):
@@ -529,7 +530,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
             zi = img_sm[xbins[i]:xbins[i+1], ydata2].sum(axis=Saxis)
 
         pguess = [np.nanmax(zi), np.nanmedian(zi), yi[np.nanargmax(zi)], 2.]
-        popt,pcov = curve_fit(_gaus, yi[np.isfinite(ztot)], zi[np.isfinite(ztot)], p0=pguess)
+        popt,pcov = curve_fit(_gaus, yi[np.isfinite(zi)], zi[np.isfinite(zi)], p0=pguess)
 
         # if gaussian fits off chip, then use chip-integrated answer
         if (popt[2] <= min(ydata)+25) or (popt[2] >= max(ydata)-25):

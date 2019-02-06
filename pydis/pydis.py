@@ -1033,7 +1033,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
         # import the linelist
         linewave = np.genfromtxt(os.path.join(linelists_dir, linelist), dtype='float',
-                              skiprows=1,usecols=(0,),unpack=True)
+                              skip_header=1,usecols=(0,),unpack=True)
 
 
         pcent_pix, wcent_pix = find_peaks(wtemp, slice, pwidth=10, pthreshold=97)
@@ -1215,7 +1215,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
         if (len(previous)>0):
             pcent, wcent = np.genfromtxt(previous, dtype='float',
-                                      unpack=True, skiprows=1,delimiter=',')
+                                      unpack=True, skip_header=1,delimiter=',')
 
 
         #---  FIT SMOOTH FUNCTION ---
@@ -1267,7 +1267,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         hireslinelist = 'henear.dat'
         linewave2 = np.genfromtxt(os.path.join(linelists_dir, hireslinelist), dtype='float',
-                               skiprows=1, usecols=(0,), unpack=True)
+                               skip_header=1, usecols=(0,), unpack=True)
 
         tol2 = tol # / 2.0
 
@@ -1476,12 +1476,12 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
                                 'resources/extinction')
     if len(airmass_file)==0:
         air_wave, air_cor = np.genfromtxt(os.path.join(extinction_dir, airmass_file),
-                                       unpack=True,skiprows=2)
+                                       unpack=True,skip_header=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
         # print('  Note: first 2 rows are skipped, assuming header')
         air_wave, air_cor = np.genfromtxt(os.path.join(extinction_dir, airmass_file),
-                                       unpack=True,skiprows=2)
+                                       unpack=True,skip_header=2)
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
                          np.interp(obj_wave, air_wave, air_cor))
@@ -1534,7 +1534,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
 
     if os.path.isfile(os.path.join(std_dir, stdstar2)):
         std_wave, std_mag, std_wth = np.genfromtxt(os.path.join(std_dir, stdstar2),
-                                                skiprows=1, unpack=True)
+                                                skip_header=1, unpack=True)
         # standard star spectrum is stored in magnitude units
         std_flux = _mag2flux(std_wave, std_mag)
 

@@ -516,15 +516,16 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
     ydata2 = ydata[np.where((ydata>=popt_tot[2] - popt_tot[3]*bigbox) &
                             (ydata<=popt_tot[2] + popt_tot[3]*bigbox))]
 
+    ztot = img_sm.sum(axis=Saxis)[ydata2]
     yi = np.arange(img.shape[Waxis])[ydata2]
     # define the X-bin edges
-    xbins = np.linspace(0, img.shape[Saxis], nsteps)
-    ybins = np.zeros_like(xbins)
+    xbins = np.linspace(0, img.shape[Saxis], nsteps, dtype='int')
+    ybins = np.zeros_like(xbins, dtype='int')
 
     for i in range(0,len(xbins)-1):
         #-- fit gaussian w/i each window
         if Saxis is 1:
-            zi = img_sm[ydata2, xbins[i]:xbins[i+1]].sum(axis=Saxis)
+            zi = np.sum(img_sm[ydata2, xbins[i]:xbins[i+1]], axis=Saxis)
         else:
             zi = img_sm[xbins[i]:xbins[i+1], ydata2].sum(axis=Saxis)
 
@@ -532,7 +533,7 @@ def ap_trace(img, fmask=(1,), nsteps=20, interac=False,
         popt,pcov = curve_fit(_gaus, yi[np.isfinite(ztot)], zi[np.isfinite(ztot)], p0=pguess)
 
         # if gaussian fits off chip, then use chip-integrated answer
-        if (popt[2] <= min(ydata)+25) or (popt[2] >= max(ydata)-25):
+        if (popt[2] <= min(ydata2)+25) or (popt[2] >= max(ydata2)-25):
             ybins[i] = popt_tot[2]
             popt = popt_tot
         else:
@@ -886,7 +887,7 @@ def ap_extract(img, trace, apwidth=8, skysep=3, skywidth=7, skydeg=0,
             widthdn = trace[i] - 1
 
         # simply add up the total flux around the trace +/- width
-        onedspec[i] = img[trace[i]-widthdn:trace[i]+widthup+1, i].sum()
+        onedspec[i] = img[int(trace[i]-widthdn):int(trace[i]+widthup+1), i].sum()
 
         #-- now do the sky fit
         itrace = int(trace[i])
@@ -1022,70 +1023,74 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
     ######   IDENTIFY   (auto and interac modes)
     # = = = = = = = = = = = = = = = =
     #-- automatic mode
-    if (interac is False) and (len(previous)==0):
-        print("Doing automatic wavelength calibration on HeNeAr.")
-        print("Note, this is not very robust. Suggest you re-run with interac=True")
-        # find the linelist of choice
+    if (interac is False):
+        if (len(previous)==0):
+            print("Doing automatic wavelength calibration on HeNeAr.")
+            print("Note, this is not very robust. Suggest you re-run with interac=True")
+            # find the linelist of choice
 
-        linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
-        # if (len(linelist)==0):
-        #     linelist = os.path.join(linelists_dir, linelist)
+            linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
+            # if (len(linelist)==0):
+            #     linelist = os.path.join(linelists_dir, linelist)
 
-        # import the linelist
-        linewave = np.genfromtxt(os.path.join(linelists_dir, linelist), dtype='float',
-                              skiprows=1,usecols=(0,),unpack=True)
+            # import the linelist
+            linewave = np.genfromtxt(os.path.join(linelists_dir, linelist), dtype='float',
+                                     skip_header=1,usecols=(0,),unpack=True)
 
 
-        pcent_pix, wcent_pix = find_peaks(wtemp, slice, pwidth=10, pthreshold=97)
+            pcent_pix, wcent_pix = find_peaks(wtemp, slice, pwidth=10, pthreshold=97)
 
-    #   loop thru each peak, from center outwards. a greedy solution
-    #   find nearest list line. if not line within tolerance, then skip peak
-        pcent = []
-        wcent = []
+        #   loop thru each peak, from center outwards. a greedy solution
+        #   find nearest list line. if not line within tolerance, then skip peak
+            pcent = []
+            wcent = []
 
-        # find center-most lines, sort by dist from center pixels
-        ss = np.argsort(np.abs(wcent_pix-wcen_approx))
+            # find center-most lines, sort by dist from center pixels
+            ss = np.argsort(np.abs(wcent_pix-wcen_approx))
 
-        #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
-        coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
+            #coeff = [0.0, 0.0, disp_approx*sign, wcen_approx]
+            coeff = np.append(np.zeros(fit_order-1),(disp_approx*sign, wcen_approx))
 
-        for i in range(len(pcent_pix)):
-            xx = pcent_pix-len(slice)/2
-            #wcent_pix = coeff[3] + xx * coeff[2] + coeff[1] * (xx*xx) + coeff[0] * (xx*xx*xx)
-            wcent_pix = np.polyval(coeff, xx)
-
-            if display is True:
-                plt.figure()
-                plt.plot(wtemp, slice, 'b')
-                plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
-                plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
-                plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
-
-            # if there is a match w/i the linear tolerance
-            if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
-                # add corresponding pixel and *actual* wavelength to output vectors
-                pcent = np.append(pcent,pcent_pix[ss[i]])
-                wcent = np.append(wcent, linewave[np.argmin(np.abs(wcent_pix[ss[i]] - linewave))] )
+            for i in range(len(pcent_pix)):
+                xx = pcent_pix-len(slice)/2
+                #wcent_pix = coeff[3] + xx * coeff[2] + coeff[1] * (xx*xx) + coeff[0] * (xx*xx*xx)
+                wcent_pix = np.polyval(coeff, xx)
 
                 if display is True:
-                    plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
+                    plt.figure()
+                    plt.plot(wtemp, slice, 'b')
+                    plt.scatter(linewave,np.ones_like(linewave)*np.nanmax(slice),marker='o',c='cyan')
+                    plt.scatter(wcent_pix,np.ones_like(wcent_pix)*np.nanmax(slice)/2.,marker='*',c='green')
+                    plt.scatter(wcent_pix[ss[i]],np.nanmax(slice)/2., marker='o',c='orange')
 
-                if (len(pcent)>fit_order):
-                    coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
+                # if there is a match w/i the linear tolerance
+                if (min((np.abs(wcent_pix[ss][i] - linewave))) < tol):
+                    # add corresponding pixel and *actual* wavelength to output vectors
+                    pcent = np.append(pcent,pcent_pix[ss[i]])
+                    wcent = np.append(wcent, linewave[np.argmin(np.abs(wcent_pix[ss[i]] - linewave))] )
 
-            if display is True:
-                plt.xlim((min(wtemp),max(wtemp)))
-                plt.show()
+                    if display is True:
+                        plt.scatter(wcent,np.ones_like(wcent)*np.nanmax(slice),marker='o',c='red')
 
-        lout = open(calimage+'.lines', 'w')
-        lout.write("# This file contains the HeNeAr lines identified [auto] Columns: (pixel, wavelength) \n")
-        for l in range(len(pcent)):
-            lout.write(str(pcent[l]) + ', ' + str(wcent[l])+'\n')
-        lout.close()
+                    if (len(pcent)>fit_order):
+                        coeff = np.polyfit(pcent-len(slice)/2, wcent, fit_order)
 
-        # the end result is the vector "coeff" has the wavelength solution for "slice"
-        # update the "wtemp" vector that goes with "slice" (fluxes)
-        wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+                if display is True:
+                    plt.xlim((min(wtemp),max(wtemp)))
+                    plt.show()
+
+            lout = open(calimage+'.lines', 'w')
+            lout.write("# This file contains the HeNeAr lines identified [auto] Columns: (pixel, wavelength) \n")
+            for l in range(len(pcent)):
+                lout.write(str(pcent[l]) + ', ' + str(wcent[l])+'\n')
+            lout.close()
+
+            # the end result is the vector "coeff" has the wavelength solution for "slice"
+            # update the "wtemp" vector that goes with "slice" (fluxes)
+            wtemp = np.polyval(coeff, (np.arange(len(slice))-len(slice)/2))
+        if (len(previous) > 0):
+            pcent, wcent = np.genfromtxt(previous, dtype='float',
+                                         unpack=True, skip_header=1, delimiter=',')
 
 
     # = = = = = = = = = = = = = = = =
@@ -1215,7 +1220,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
 
         if (len(previous)>0):
             pcent, wcent = np.genfromtxt(previous, dtype='float',
-                                      unpack=True, skiprows=1,delimiter=',')
+                                      unpack=True, skip_header=1,delimiter=',')
 
 
         #---  FIT SMOOTH FUNCTION ---
@@ -1267,7 +1272,7 @@ def HeNeAr_fit(calimage, linelist='apohenear.dat', interac=True,
         linelists_dir = os.path.dirname(os.path.realpath(__file__))+ '/resources/linelists/'
         hireslinelist = 'henear.dat'
         linewave2 = np.genfromtxt(os.path.join(linelists_dir, hireslinelist), dtype='float',
-                               skiprows=1, usecols=(0,), unpack=True)
+                               skip_header=1, usecols=(0,), unpack=True)
 
         tol2 = tol # / 2.0
 
@@ -1476,12 +1481,12 @@ def AirmassCor(obj_wave, obj_flux, airmass, airmass_file='apoextinct.dat'):
                                 'resources/extinction')
     if len(airmass_file)==0:
         air_wave, air_cor = np.genfromtxt(os.path.join(extinction_dir, airmass_file),
-                                       unpack=True,skiprows=2)
+                                       unpack=True,skip_header=2)
     else:
         print('> Loading airmass library file: '+airmass_file)
         # print('  Note: first 2 rows are skipped, assuming header')
         air_wave, air_cor = np.genfromtxt(os.path.join(extinction_dir, airmass_file),
-                                       unpack=True,skiprows=2)
+                                       unpack=True,skip_header=2)
     # air_cor in units of mag/airmass
     airmass_ext = 10.0**(0.4 * airmass *
                          np.interp(obj_wave, air_wave, air_cor))
@@ -1534,7 +1539,7 @@ def DefFluxCal(obj_wave, obj_flux, stdstar='', mode='spline', polydeg=9,
 
     if os.path.isfile(os.path.join(std_dir, stdstar2)):
         std_wave, std_mag, std_wth = np.genfromtxt(os.path.join(std_dir, stdstar2),
-                                                skiprows=1, unpack=True)
+                                                   skip_header=1, unpack=True)
         # standard star spectrum is stored in magnitude units
         std_flux = _mag2flux(std_wave, std_mag)
 

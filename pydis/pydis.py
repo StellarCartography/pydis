@@ -352,7 +352,7 @@ def flatcombine(flatlist, bias, output='FLAT.fits', trim=True, mode='spline',
         xdata = np.arange(all_data.shape[1]) # x pixels
 
         # sum along spatial axis, smooth w/ 5pixel boxcar, take log of summed flux
-        flat_1d = np.log10(convolve(flat_stack.sum(axis=Waxis), Box1DKernel(5)))
+        flat_1d = np.log10(convolve(flat_stack[ok,:].mean(axis=Waxis), Box1DKernel(5)))
 
         if mode=='spline':
             spl = UnivariateSpline(xdata, flat_1d, ext=0, k=2 ,s=0.001)

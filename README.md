@@ -1,7 +1,9 @@
+# NOTE: PyDIS is now deprecated
+This project was an important learning tool for me back in 2015, and I believe helped move Python spectroscopic data reduction forward in general (e.g. several pieces of code and the workflow have made their way into `astropy` modules). It is no longer being maintained or used, and has been replaced by [PyKOSMOS](https://github.com/jradavenport/pykosmos). 
+
+The repo is saved here for posterity
+
 # *PyDIS* [![DOI](https://zenodo.org/badge/9547/jradavenport/pydis.svg)](https://zenodo.org/badge/latestdoi/9547/jradavenport/pydis)
-
-[![Build Status](https://travis-ci.org/TheAstroFactory/pydis.svg?branch=master)](https://travis-ci.org/TheAstroFactory/pydis) [![Documentation Status](https://readthedocs.org/projects/pydis/badge/?version=master)](http://pydis.readthedocs.io/?badge=master)
-
 
 An easy to use reduction package for one dimensional longslit spectroscopy using Python. 
 
